@@ -8,94 +8,79 @@ use Illuminate\Support\Str;
 use Throwable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+
+use function Laravel\Prompts\error;
 
 class UsulanController
 {
     public function index(Request $request)
     {
-        // 🔍 Search global
-        $query = Usulan::with(['subJenisBantuan', 'kategori' , 'opd', 'desa']);
+        $query = Usulan::with(['subJenisBantuan', 'kategori', 'opd', 'desa']);
 
+        // 🔍 Search global (tetap punyamu)
         if ($search = $request->input('q')) {
             $query->where(function ($q) use ($search) {
                 $q->where('judul', 'like', "%{$search}%")
-                  ->orWhere('anggaran_usulan', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('nohp', 'like', "%{$search}%")
-                  ->orWhere('anggaran_disetujui', 'like', "%{$search}%")
-                  ->orWhere('nama', 'like', "%{$search}%")
-                  ->orWhere('status', 'like', "%{$search}%")
-                  ->orWhere('anggaran_usulan', 'like', "%{$search}%")
-                  ->orWhereHas('subJenisBantuan', function ($qq) use ($search) {
-                        $qq->where('namasubjenis', 'like', "%{$search}%");
-                    })
-                     // 🔎 cari di relasi kategori
-                    ->orWhereHas('kategori', function ($qq) use ($search) {
-                        $qq->where('namakategori', 'like', "%{$search}%");
-                    })
-
-                    // 🔎 cari di relasi opd
-                    ->orWhereHas('opd', function ($qq) use ($search) {
-                        $qq->where('nama_opd', 'like', "%{$search}%");
-                    })
-
-                    // 🔎 cari di relasi desa
-                    ->orWhereHas('desa', function ($qq) use ($search) {
-                        $qq->where('namadesa', 'like', "%{$search}%");
-                    });
-
+                ->orWhere('idusulan', 'like', "%{$search}%")
+                ->orWhere('anggaran_usulan', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('nohp', 'like', "%{$search}%")
+                ->orWhere('anggaran_disetujui', 'like', "%{$search}%")
+                ->orWhere('nama', 'like', "%{$search}%")
+                ->orWhere('status', 'like', "%{$search}%")
+                ->orWhereHas('subJenisBantuan', fn($qq) => $qq->where('namasubjenis', 'like', "%{$search}%"))
+                ->orWhereHas('kategori', fn($qq) => $qq->where('namakategori', 'like', "%{$search}%"))
+                ->orWhereHas('opd', fn($qq) => $qq->where('nama_opd', 'like', "%{$search}%"))
+                ->orWhereHas('desa', fn($qq) => $qq->where('namadesa', 'like', "%{$search}%"));
             });
         }
 
         // 🔽 Sorting
-        $sortBy = $request->input('sort_by', 'id');
+        $sortBy  = $request->input('sort_by', 'idusulan');
         $sortDir = $request->input('sort_dir', 'asc');
 
-        $allowedSorts = [
-            'idusulan',
-            'judul',
-            'anggaran_usulan',
-            'anggaran_disetujui',
-            'email',
-            'nohp',
-            'status',
-            'nama',
-            'subJenisBantuan.namasubjenis',
-            'kategori.namakategori',
-            'opd.nama_opd',
-            'desa.namadesa'
+        // kolom langsung di tabel usulan
+        $directSorts = [
+            'idusulan', 'judul', 'anggaran_usulan', 'anggaran_disetujui',
+            'email', 'nohp', 'status', 'nama'
         ];
 
-        // Handle sorting
-        if (in_array($sortBy, $allowedSorts)) {
-            if (str_contains($sortBy, '.')) {
-            // Handle relation sorting
-            [$relation, $column] = explode('.', $sortBy);
-            if ($relation === 'opd') {
-                $query->join($relation, "usulan.kode_opd", '=', "opd.kode_opd")
-                  ->orderBy("{$relation}.{$column}", $sortDir)
-                  ->select('usulan.*');
-            } else {
-                $query->join($relation, "usulan.id{$relation}", '=', "{$relation}.id{$relation}")
-                  ->orderBy("{$relation}.{$column}", $sortDir)
-                  ->select('usulan.*');
-            }
-            } else {
-            $query->orderBy($sortBy, $sortDir);
-            }
-        }
+        // mapping sort relasi => [table, column, local_key, foreign_key]
+        $relationSorts = [
+            // kamu bisa ganti 'sub_jenis_bantuan' sesuai nama tabel aslinya
+            'subjenis' => ['table' => 'sub_jenis_bantuan', 'column' => 'namasubjenis', 'local_key' => 'idsubjenisbantuan', 'foreign_key' => 'idsubjenisbantuan'],
+            'kategori' => ['table' => 'kategori',           'column' => 'namakategori',  'local_key' => 'idkategori',        'foreign_key' => 'idkategori'],
+            'opd'      => ['table' => 'opd',                'column' => 'nama_opd',      'local_key' => 'kode_opd',          'foreign_key' => 'kode_opd'],
+            'desa'     => ['table' => 'desa',               'column' => 'namadesa',      'local_key' => 'iddesa',            'foreign_key' => 'iddesa'],
+        ];
 
-        if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortDir);
+        if (in_array($sortBy, $directSorts)) {
+            $query->orderBy("usulan.$sortBy", $sortDir);
+        } elseif (array_key_exists($sortBy, $relationSorts)) {
+            [$table, $column, $local, $foreign] = [
+                $relationSorts[$sortBy]['table'],
+                $relationSorts[$sortBy]['column'],
+                $relationSorts[$sortBy]['local_key'],
+                $relationSorts[$sortBy]['foreign_key'],
+            ];
+
+            // LEFT JOIN supaya data usulan tanpa relasi tetap ikut
+            $query->leftJoin($table, "usulan.$local", '=', "$table.$foreign")
+                ->orderBy("$table.$column", $sortDir)
+                ->select('usulan.*'); // hindari ambiguitas kolom
+        } else {
+            // fallback aman
+            $query->orderBy('usulan.idusulan', 'asc');
         }
 
         // 📄 Pagination
-        $perPage = $request->input('per_page', 10);
-        $page = $request->input('page', 1);
+        $perPage = (int) $request->input('per_page', 10);
+        $page    = (int) $request->input('page', 1);
 
         $usulan = $query->paginate($perPage, ['*'], 'page', $page);
 
-        // 🖼️ Ubah URL file_persyaratan jadi absolute path
+        // 🖼️ absolute URL untuk file
         $usulan->getCollection()->transform(function ($item) {
             $item->file_persyaratan = $item->file_persyaratan
                 ? asset("storage/uploads/{$item->file_persyaratan}")
@@ -103,7 +88,6 @@ class UsulanController
             return $item;
         });
 
-        // 📦 Kembalikan response terstruktur
         return response()->json([
             'data' => $usulan->items(),
             'meta' => [
@@ -113,11 +97,11 @@ class UsulanController
                 'total_pages' => $usulan->lastPage(),
                 'sort_by'     => $sortBy,
                 'sort_dir'    => $sortDir,
-                'search'      => $search,
-            ]
+                'search'      => $search ?? null,
+            ],
         ]);
-
     }
+
 
     /**
      * Store a newly created resource in storage.
@@ -130,8 +114,8 @@ class UsulanController
                 'anggaran_usulan'    => ['required', 'integer', 'min:0'],
                 'anggaran_disetujui' => ['required', 'integer', 'min:0'],
 
-                // file rar/zip max 2MB
-                'file_persyaratan'   => ['required', 'file', 'max:2048', 'mimes:zip,rar'],
+                // file max 2MB
+                'file_persyaratan'   => ['required', 'file', 'max:2048'],
 
                 'email'              => ['required', 'email', 'max:50'],
                 'nohp'               => ['required', 'string', 'max:15'],
@@ -181,28 +165,38 @@ class UsulanController
     /**
      * Display the specified resource.
      */
-    public function show(Usulan $usulan)
+    public function show( String $id)
     {
-        $usulan->file_persyaratan = $usulan->file_persyaratan ? Storage::url('uploads/' . $usulan->file_persyaratan) : null;
-        return response()->json([
-            'code'    => 'success',
-            'message' => 'OK',
-            'data'    => $usulan,
-        ], 200);
+        try {
+            $usulan = Usulan::with(['subJenisBantuan', 'kategori', 'opd', 'desa', 'spj'])->findOrFail($id);
+            $usulan->file_persyaratan = $usulan->file_persyaratan ? Storage::url('uploads/' . $usulan->file_persyaratan) : null;
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'OK',
+                'data'    => $usulan,
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Usulan tidak ditemukan',
+                'error'   => $e->getMessage(),
+            ], 404);
+        }
     }
 
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Usulan $usulan)
+    public function update(Request $request, String $id)
     {
           try {
+            $usulan = Usulan::findOrFail($id);
             $validated = $request->validate([
                 'judul'              => ['sometimes', 'string', 'max:255'],
                 'anggaran_usulan'    => ['sometimes', 'integer', 'min:0'],
                 'anggaran_disetujui' => ['sometimes', 'integer', 'min:0'],
-                'file_persyaratan'   => ['sometimes', 'file', 'max:2048', 'mimes:zip,rar'],
+                'file_persyaratan'   => ['sometimes', 'file', 'max:2048'],
                 'email'              => ['sometimes', 'email', 'max:50'],
                 'nohp'               => ['sometimes', 'string', 'max:15'],
                 'nama'               => ['sometimes', 'string', 'max:50'],
@@ -233,7 +227,7 @@ class UsulanController
                 'data'    => $usulan->fresh(),
             ], 200);
 
-        } catch (Throwable $e) {
+        } catch (Throwable|ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Gagal memperbarui layanan',
@@ -245,9 +239,10 @@ class UsulanController
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Usulan $usulan)
+    public function destroy(String $id)
     {
         try {
+            $usulan = Usulan::findOrFail($id);
             // hapus file dari storage jika ada
             if ($usulan->file_persyaratan && Storage::exists('public/uploads/' . $usulan->file_persyaratan)) {
                 Storage::delete('public/uploads/' . $usulan->file_persyaratan);
@@ -259,7 +254,7 @@ class UsulanController
                 'code'    => 'success',
                 'message' => 'Usulan berhasil dihapus',
             ], 200);
-        } catch (Throwable $e) {
+        } catch (Throwable|ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Gagal menghapus usulan',
@@ -274,19 +269,22 @@ class UsulanController
      */
     public function getLogs(Request $request)
     {
-        $query = \DB::table('usulan_log');
+        $query = \DB::table('usulan_log')
+            ->join('usulan', 'usulan_log.idusulan', '=', 'usulan.idusulan')
+            ->leftJoin('users', 'usulan_log.iduser', '=', 'users.id')
+            ->select('usulan_log.*', 'usulan.judul as judul_usulan', 'users.name as nama_user');
 
         if ($request->filled('tanggal')) {
-            $query->whereDate('tanggal', $request->input('tanggal'));
+            $query->whereDate('usulan_log.tanggal', $request->input('tanggal'));
         }
-        if ($request->filled('id_user')) {
-            $query->where('id_user', $request->input('id_user'));
+        if ($request->filled('iduser')) {
+            $query->where('usulan_log.iduser', $request->input('iduser'));
         }
-        if ($request->filled('id_usulan')) {
-            $query->where('id_usulan', $request->input('id_usulan'));
+        if ($request->filled('idusulan')) {
+            $query->where('usulan_log.idusulan', $request->input('idusulan'));
         }
 
-        $logs = $query->orderByDesc('tanggal')->get();
+        $logs = $query->orderByDesc('usulan_log.tanggal')->get();
 
         return response()->json([
             'code'    => 'success',

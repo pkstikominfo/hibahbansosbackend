@@ -6,7 +6,8 @@ use App\Http\Controllers\Api\OpdController;
 use App\Http\Controllers\Api\DesaController;
 use App\Http\Controllers\Api\KecamatanController;
 use App\Http\Controllers\Api\UsulanController;
-
+use App\Http\Controllers\Api\SpjController;
+use App\Models\Spj;
 
 // API Kecamatan
 Route::apiResource('kecamatan', KecamatanController::class);
@@ -30,3 +31,4 @@ Route::get('/opd-paginated', [OpdController::class, 'paginated']);
 
 Route::apiResource('usulan', UsulanController::class);
 Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
+Route::apiResource('spj', SpjController::class);

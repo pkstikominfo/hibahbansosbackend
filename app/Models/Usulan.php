@@ -30,7 +30,7 @@ class Usulan extends Model
         'nama'
     ];
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     // Relasi ke sub_jenis_bantuan
     public function subJenisBantuan()

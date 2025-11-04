@@ -38,7 +38,19 @@ class User extends Authenticatable
     // Relasi ke usulan_log
     public function usulanLogs()
     {
-        return $this->hasMany(UsulanLog::class, 'iduser', 'iduser');
+        return $this->hasMany(UsulanLog::class, 'created_by', 'iduser');
+    }
+
+    // Relasi ke usulan_log
+   // Relasi ke SPJ
+    public function spjCreated()
+    {
+        return $this->hasMany(Spj::class, 'created_by', 'iduser');
+    }
+
+    public function spjUpdated()
+    {
+        return $this->hasMany(Spj::class, 'updated_by', 'iduser');
     }
 
     // Scope untuk filter peran

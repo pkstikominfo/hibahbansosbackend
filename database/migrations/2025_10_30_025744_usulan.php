@@ -16,10 +16,10 @@ return new class extends Migration
             $table->text('judul')->nullable();
             $table->integer('anggaran_usulan')->nullable();
             $table->string('file_persyaratan', 100)->nullable();
-            $table->string('email', 30)->nullable();
-            $table->string('nohp', 12)->nullable();
-            $table->tinyInteger('idsubjenisbantuan')->nullable();
-            $table->tinyInteger('idkategori')->nullable();
+            $table->string('email', 30);
+            $table->string('nohp', 12);
+            $table->tinyInteger('idsubjenisbantuan');
+            $table->tinyInteger('idkategori');
             $table->integer('anggaran_disetujui')->nullable();
             $table->char('kode_opd', 10)->nullable();
             $table->enum('status', ['diusulkan', 'disetujui'])->nullable();
@@ -30,11 +30,19 @@ return new class extends Migration
             $table->foreign('idsubjenisbantuan')->references('idsubjenisbantuan')->on('sub_jenis_bantuan');
             $table->foreign('idkategori')->references('idkategori')->on('kategori');
             $table->foreign('kode_opd')->references('kode_opd')->on('opd');
+            $table->timestamps();
         });
     }
 
     public function down()
     {
-        Schema::dropIfExists('usulan');
+          Schema::table('spj', function (Blueprint $table) {
+            // Lepas foreign key terlebih dahulu
+            $table->dropForeign(['idusulan']);
+            $table->dropForeign(['created_by']);
+            $table->dropForeign(['updated_by']);
+        });
+
+        Schema::dropIfExists('spj');
     }
 };
