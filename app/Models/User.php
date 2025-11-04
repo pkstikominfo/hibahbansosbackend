@@ -12,12 +12,12 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     protected $table = 'users';
-    protected $primaryKey = 'iduser';
+    protected $primaryKey = 'id';
 
     protected $fillable = [
         'username',
         'password',
-        'nama',
+        'name',
         'email',
         'nohp',
         'peran',
@@ -38,7 +38,7 @@ class User extends Authenticatable
     // Relasi ke usulan_log
     public function usulanLogs()
     {
-        return $this->hasMany(UsulanLog::class, 'iduser', 'iduser');
+        return $this->hasMany(UsulanLog::class, 'iduser', 'id');
     }
 
     // Scope untuk filter peran

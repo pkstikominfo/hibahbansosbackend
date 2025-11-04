@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\OpdController;
 use App\Http\Controllers\Api\DesaController;
+use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\KecamatanController;
 
 
@@ -29,3 +30,12 @@ Route::apiResource('opd', OpdController::class);
 Route::get('/opd-search', [OpdController::class, 'search']);
 Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
 Route::get('/opd-paginated', [OpdController::class, 'paginated']);
+
+
+// Routes untuk User
+Route::apiResource('users', UserController::class);
+// Additional routes untuk User
+Route::get('/users-search', [UserController::class, 'search']);
+Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
+Route::get('/users-paginated', [UserController::class, 'paginated']);
+Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
