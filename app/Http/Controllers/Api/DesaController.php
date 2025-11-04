@@ -41,12 +41,17 @@ class DesaController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'idkecamatan' => 'required|integer|exists:kecamatan,idkecamatan',
-                'namadesa' => 'required|string|max:255'
+                'namadesa' => 'required|string|max:255|unique:desa,namadesa',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180'
             ], [
                 'idkecamatan.required' => 'Kecamatan wajib dipilih',
                 'idkecamatan.exists' => 'Kecamatan tidak valid',
                 'namadesa.required' => 'Nama desa wajib diisi',
-                'namadesa.max' => 'Nama desa maksimal 255 karakter'
+                'namadesa.max' => 'Nama desa maksimal 255 karakter',
+                'namadesa.unique' => 'Nama desa sudah digunakan',
+                'latitude.between' => 'Latitude harus antara -90 dan 90',
+                'longitude.between' => 'Longitude harus antara -180 dan 180'
             ]);
 
             if ($validator->fails()) {
@@ -58,8 +63,6 @@ class DesaController extends Controller
             }
 
             $desa = Desa::create($validator->validated());
-
-            // Load relasi kecamatan untuk response
             $desa->load('kecamatan');
 
             return response()->json([
@@ -122,11 +125,16 @@ class DesaController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'idkecamatan' => 'sometimes|required|integer|exists:kecamatan,idkecamatan',
-                'namadesa' => 'sometimes|required|string|max:255'
+                'namadesa' => 'sometimes|required|string|max:255|unique:desa,namadesa,' . $id . ',iddesa',
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180'
             ], [
                 'idkecamatan.exists' => 'Kecamatan tidak valid',
                 'namadesa.required' => 'Nama desa wajib diisi',
-                'namadesa.max' => 'Nama desa maksimal 255 karakter'
+                'namadesa.max' => 'Nama desa maksimal 255 karakter',
+                'namadesa.unique' => 'Nama desa sudah digunakan',
+                'latitude.between' => 'Latitude harus antara -90 dan 90',
+                'longitude.between' => 'Longitude harus antara -180 dan 180'
             ]);
 
             if ($validator->fails()) {
@@ -283,6 +291,137 @@ class DesaController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengambil data desa',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get desa berdasarkan koordinat (radius search)
+     */
+    public function getByCoordinates(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'latitude' => 'required|numeric|between:-90,90',
+                'longitude' => 'required|numeric|between:-180,180',
+                'radius' => 'nullable|numeric|min:1|max:100' // dalam kilometer
+            ], [
+                'latitude.required' => 'Latitude wajib diisi',
+                'latitude.between' => 'Latitude harus antara -90 dan 90',
+                'longitude.required' => 'Longitude wajib diisi',
+                'longitude.between' => 'Longitude harus antara -180 dan 180',
+                'radius.min' => 'Radius minimal 1 km',
+                'radius.max' => 'Radius maksimal 100 km'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $validated = $validator->validated();
+            $latitude = $validated['latitude'];
+            $longitude = $validated['longitude'];
+            $radius = $validated['radius'] ?? 10; // default 10 km
+
+            $desas = Desa::dekatDengan($latitude, $longitude, $radius)
+                ->with('kecamatan')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data desa berdasarkan koordinat berhasil diambil',
+                'data' => $desas,
+                'search_params' => [
+                    'latitude' => $latitude,
+                    'longitude' => $longitude,
+                    'radius_km' => $radius
+                ]
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data desa berdasarkan koordinat',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get desa yang memiliki koordinat
+     */
+    public function denganKoordinat(): JsonResponse
+    {
+        try {
+            $desas = Desa::whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->with('kecamatan')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data desa dengan koordinat berhasil diambil',
+                'data' => $desas,
+                'total' => $desas->count()
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data desa dengan koordinat',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update koordinat untuk desa tertentu
+     */
+    public function updateKoordinat(Request $request, string $id): JsonResponse
+    {
+        try {
+            $desa = Desa::find($id);
+
+            if (!$desa) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Desa tidak ditemukan'
+                ], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'latitude' => 'required|numeric|between:-90,90',
+                'longitude' => 'required|numeric|between:-180,180'
+            ], [
+                'latitude.required' => 'Latitude wajib diisi',
+                'latitude.between' => 'Latitude harus antara -90 dan 90',
+                'longitude.required' => 'Longitude wajib diisi',
+                'longitude.between' => 'Longitude harus antara -180 dan 180'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $desa->update($validator->validated());
+            $desa->load('kecamatan');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Koordinat desa berhasil diperbarui',
+                'data' => $desa
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperbarui koordinat desa',
                 'error' => $e->getMessage()
             ], 500);
         }
