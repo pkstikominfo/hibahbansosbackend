@@ -9,63 +9,23 @@ class Desa extends Model
 {
     use HasFactory;
 
-    /**
-     * Nama tabel yang terkait dengan model.
-     *
-     * @var string
-     */
     protected $table = 'desa';
-
-    /**
-     * Primary key untuk model.
-     *
-     * @var string
-     */
     protected $primaryKey = 'iddesa';
-
-    /**
-     * Tipe data primary key.
-     *
-     * @var string
-     */
     protected $keyType = 'int';
-
-    /**
-     * Menunjukkan apakah primary key auto increment.
-     *
-     * @var bool
-     */
     public $incrementing = true;
-
-    /**
-     * Nonaktifkan timestamps (created_at dan updated_at)
-     *
-     * @var bool
-     */
     public $timestamps = false;
 
-    /**
-     * Kolom yang dapat diisi secara massal.
-     *
-     * @var array
-     */
     protected $fillable = [
-        'iddesa',
         'idkecamatan',
-        'namadesa'
+        'namadesa',
+        'latitude',
+        'longitude'
     ];
 
-    /**
-     * Kolom yang harus disembunyikan dari array dan JSON.
-     *
-     * @var array
-     */
     protected $hidden = [];
 
     /**
      * Relasi many-to-one dengan Kecamatan.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
     public function kecamatan()
     {
@@ -74,10 +34,6 @@ class Desa extends Model
 
     /**
      * Scope query untuk mencari desa berdasarkan nama.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $nama
-     * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeCariNama($query, $nama)
     {
@@ -86,10 +42,6 @@ class Desa extends Model
 
     /**
      * Scope query untuk mencari desa berdasarkan kecamatan.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param int $idKecamatan
-     * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeDariKecamatan($query, $idKecamatan)
     {
@@ -97,10 +49,22 @@ class Desa extends Model
     }
 
     /**
+     * Scope query untuk mencari desa berdasarkan koordinat (radius dalam km)
+     */
+    public function scopeDekatDengan($query, $latitude, $longitude, $radiusKm = 10)
+    {
+        $earthRadius = 6371; // Radius bumi dalam kilometer
+
+        return $query->selectRaw("
+            *,
+            ($earthRadius * ACOS(COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude)))) AS distance
+        ", [$latitude, $longitude, $latitude])
+            ->having('distance', '<=', $radiusKm)
+            ->orderBy('distance');
+    }
+
+    /**
      * Accessor untuk nama desa (title case).
-     *
-     * @param string $value
-     * @return string
      */
     public function getNamadesaAttribute($value)
     {
@@ -109,9 +73,6 @@ class Desa extends Model
 
     /**
      * Mutator untuk nama desa (menyimpan sebagai lowercase).
-     *
-     * @param string $value
-     * @return void
      */
     public function setNamadesaAttribute($value)
     {
@@ -119,9 +80,21 @@ class Desa extends Model
     }
 
     /**
+     * Accessor untuk koordinat dalam format array.
+     */
+    public function getKoordinatAttribute()
+    {
+        if ($this->latitude && $this->longitude) {
+            return [
+                'latitude' => (float) $this->latitude,
+                'longitude' => (float) $this->longitude
+            ];
+        }
+        return null;
+    }
+
+    /**
      * Accessor untuk nama desa lengkap (dengan nama kecamatan).
-     *
-     * @return string
      */
     public function getNamaLengkapAttribute()
     {
@@ -133,5 +106,11 @@ class Desa extends Model
     public function usulan()
     {
         return $this->hasMany(Usulan::class, 'iddesa', 'iddesa');
+    /**
+     * Check apakah desa memiliki koordinat.
+     */
+    public function memilikiKoordinat()
+    {
+        return !is_null($this->latitude) && !is_null($this->longitude);
     }
 }

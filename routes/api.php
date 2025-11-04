@@ -20,6 +20,9 @@ Route::apiResource('desa', DesaController::class);
 Route::get('/desa-kecamatan/{idKecamatan}', [DesaController::class, 'getByKecamatan']);
 Route::get('/desa-search', [DesaController::class, 'search']);
 Route::get('/desa-paginated', [DesaController::class, 'paginated']);
+Route::get('/desa-by-coordinates', [DesaController::class, 'getByCoordinates']);
+Route::get('/desa-dengan-koordinat', [DesaController::class, 'denganKoordinat']);
+Route::put('/desa/{id}/koordinat', [DesaController::class, 'updateKoordinat']);
 
 
 // Routes untuk OPD
