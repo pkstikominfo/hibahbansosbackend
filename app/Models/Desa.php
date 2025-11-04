@@ -127,4 +127,11 @@ class Desa extends Model
     {
         return $this->namadesa . ', ' . ($this->kecamatan ? $this->kecamatan->namakecamatan : 'N/A');
     }
+
+
+    // Relasi ke usulan_log
+    public function usulan()
+    {
+        return $this->hasMany(Usulan::class, 'iddesa', 'iddesa');
+    }
 }

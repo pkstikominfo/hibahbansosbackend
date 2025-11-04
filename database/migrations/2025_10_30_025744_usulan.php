@@ -23,7 +23,10 @@ return new class extends Migration
             $table->integer('anggaran_disetujui')->nullable();
             $table->char('kode_opd', 10)->nullable();
             $table->enum('status', ['diusulkan', 'disetujui'])->nullable();
+            $table->softDeletes(); // Add this line for soft delete
+            $table->string('nama', 75);
 
+            $table->unsignedBigInteger('iddesa')->references('iddesa')->on('desa');
             $table->foreign('idsubjenisbantuan')->references('idsubjenisbantuan')->on('sub_jenis_bantuan');
             $table->foreign('idkategori')->references('idkategori')->on('kategori');
             $table->foreign('kode_opd')->references('kode_opd')->on('opd');
