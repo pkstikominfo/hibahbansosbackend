@@ -1,11 +1,20 @@
 <?php
 
+use App\Models\Spj;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\OpdController;
+use App\Http\Controllers\Api\SpjController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DesaController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UsulanController;
 use App\Http\Controllers\Api\KecamatanController;
+
+
+// Public routes (tanpa authentication)
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
 
 
 // API Kecamatan
@@ -31,7 +40,6 @@ Route::get('/opd-search', [OpdController::class, 'search']);
 Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
 Route::get('/opd-paginated', [OpdController::class, 'paginated']);
 
-
 // Routes untuk User
 Route::apiResource('users', UserController::class);
 // Additional routes untuk User
@@ -39,3 +47,38 @@ Route::get('/users-search', [UserController::class, 'search']);
 Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
 Route::get('/users-paginated', [UserController::class, 'paginated']);
 Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
+Route::apiResource('usulan', UsulanController::class);
+Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
+Route::apiResource('spj', SpjController::class);
+
+// Protected routes (perlu authentication)
+Route::middleware('auth:sanctum')->group(function () {
+    // Auth routes
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'user']);
+    Route::put('/user/profile', [AuthController::class, 'updateProfile']);
+    Route::put('/user/change-password', [AuthController::class, 'changePassword']);
+
+    // // CRUD routes yang sudah ada
+    // Route::apiResource('users', UserController::class);
+    // Route::apiResource('kecamatan', KecamatanController::class);
+    // Route::apiResource('desa', DesaController::class);
+    // Route::apiResource('opd', OpdController::class);
+
+    // // Additional routes
+    // Route::get('/users-search', [UserController::class, 'search']);
+    // Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
+    // Route::get('/users-paginated', [UserController::class, 'paginated']);
+    // Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
+
+    // Route::get('/desa-kecamatan/{idKecamatan}', [DesaController::class, 'getByKecamatan']);
+    // Route::get('/desa-search', [DesaController::class, 'search']);
+    // Route::get('/desa-paginated', [DesaController::class, 'paginated']);
+    // Route::get('/desa-by-coordinates', [DesaController::class, 'getByCoordinates']);
+    // Route::get('/desa-dengan-koordinat', [DesaController::class, 'denganKoordinat']);
+    // Route::put('/desa/{id}/koordinat', [DesaController::class, 'updateKoordinat']);
+
+    // Route::get('/opd-search', [OpdController::class, 'search']);
+    // Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
+    // Route::get('/opd-paginated', [OpdController::class, 'paginated']);
+});

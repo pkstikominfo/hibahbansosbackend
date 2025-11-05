@@ -6,10 +6,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Hash;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens;
 
     protected $table = 'users';
     protected $primaryKey = 'id';
@@ -39,6 +41,17 @@ class User extends Authenticatable
     public function usulanLogs()
     {
         return $this->hasMany(UsulanLog::class, 'iduser', 'id');
+    }
+
+    // Relasi ke SPJ
+    public function spjCreated()
+    {
+        return $this->hasMany(Spj::class, 'created_by', 'id');
+    }
+
+    public function spjUpdated()
+    {
+        return $this->hasMany(Spj::class, 'updated_by', 'id');
     }
 
     // Scope untuk filter peran
@@ -81,5 +94,10 @@ class User extends Authenticatable
     public function isActive()
     {
         return $this->status === 'active';
+    }
+
+    public function validateCredentials($password)
+    {
+        return Hash::check($password, $this->password);
     }
 }

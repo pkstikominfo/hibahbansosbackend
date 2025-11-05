@@ -16,11 +16,14 @@ class Spj extends Model
     protected $fillable = [
         'idusulan',
         'file_pertanggungjawaban',
+        'foto',
         'realisasi',
         'status',
+        'created_by',
+        'updated_by',
     ];
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     // Relasi ke usulan
     public function usulan()
@@ -43,5 +46,15 @@ class Spj extends Model
     public function scopeDisetujui($query)
     {
         return $query->where('status', 'disetujui');
+    }
+
+     public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'id');
     }
 }

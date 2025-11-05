@@ -5,10 +5,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Usulan extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     protected $table = 'usulan';
     protected $primaryKey = 'idusulan';
@@ -24,9 +26,11 @@ class Usulan extends Model
         'anggaran_disetujui',
         'kode_opd',
         'status',
+        'iddesa',
+        'nama'
     ];
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     // Relasi ke sub_jenis_bantuan
     public function subJenisBantuan()
@@ -44,6 +48,12 @@ class Usulan extends Model
     public function opd()
     {
         return $this->belongsTo(Opd::class, 'kode_opd', 'kode_opd');
+    }
+
+    // Relasi ke desa
+    public function desa()
+    {
+        return $this->belongsTo(Desa::class, 'iddesa', 'iddesa');
     }
 
     // Relasi ke SPJ
