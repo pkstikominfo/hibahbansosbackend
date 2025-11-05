@@ -8,40 +8,70 @@ use Illuminate\Http\Request;
 class StatistikController
 {
     public function getStatistik(Request $request)
-    {
-        $where_column   = $request->input('where_column');
-        $where_value    = $request->input('where_value');
-        $group_by       = $request->input('group_by');
+{
+    // ---- helper kecil buat bikin array where sederhana (mendukung IN)
+    $makeWhere = function (?string $col, $val): array {
+        if (empty($col) || $val === null || $val === '') return [];
+        return is_array($val) ? [$col => ['in', $val]] : [$col => $val];
+    };
 
-        $between_column = $request->input('between_column'); // optional
-        $between_start  = $request->input('between_start');  // optional
-        $between_end    = $request->input('between_end');    // optional
+    // ========= USULAN =========
+    $usulan_where       = $makeWhere($request->input('usulan_where_column'), $request->input('usulan_where_value'));
+    $usulan_group_by    = $request->input('usulan_group_by');              // ex: iddesa
+    // default between Usulan: created_at (biarkan null => fallback di model)
+    $usulan_between_col   = $request->input('usulan_between_column');      // default null -> created_at
+    $usulan_between_start = $request->input('usulan_between_start');       // optional
+    $usulan_between_end   = $request->input('usulan_between_end');         // optional
 
-        $where = [];
-        if (!empty($where_column) && $where_value !== null && $where_value !== '') {
-            $where[$where_column] = is_array($where_value)
-                ? ['in', $where_value]
-                : $where_value;
-        }
-        if (!empty($between_column) && $between_start !== null && $between_end !== null) {
-            // Bisa juga pakai properti default di model, kalau between_column kosong
-            // Di sini kita pakai request jika ada
-        }
+    // ========= SPJ =========
+    $spj_where         = $makeWhere($request->input('spj_where_column'), $request->input('spj_where_value'));
+    $spj_group_by      = $request->input('spj_group_by');                  // ex: idkecamatan
+    // default between SPJ: tgl_verifikasi (kalau tidak dikirim, kita set sendiri)
+    $spj_between_col   = $request->input('spj_between_column', 'created_at');
+    $spj_between_start = $request->input('spj_between_start');             // optional
+    $spj_between_end   = $request->input('spj_between_end');               // optional
 
-        $jumlahUsulan         = Usulan::getStatistikJumlahPenerima($where, $group_by, $between_column, $between_start, $between_end);
-        $jumlahAnggaranUsulan = Usulan::getStatistikJumlahAnggaran($where, $group_by, $between_column, $between_start, $between_end);
+    // ========= eksekusi per-model =========
+    $jumlahUsulan = (new Usulan)->getStatistikJumlahPenerima(
+        $usulan_where,
+        $usulan_group_by,
+        $usulan_between_col,
+        $usulan_between_start,
+        $usulan_between_end
+    );
 
-        $jumlahSpj            = Spj::getStatistikJumlahPenerima($where, $group_by, $between_column, $between_start, $between_end);
-        $jumlahAnggaranSpj    = Spj::getStatistikJumlahAnggaran($where, $group_by, $between_column, $between_start, $between_end);
+    $jumlahAnggaranUsulan = (new Usulan)->getStatistikJumlahAnggaran(
+        $usulan_where,
+        $usulan_group_by,
+        $usulan_between_col,
+        $usulan_between_start,
+        $usulan_between_end
+    );
 
-        return response()->json([
-            'success'               => true,
-            'message'               => 'Data statistik berhasil diambil',
-            'total_usulan'          => $jumlahUsulan,
-            'total_anggaran_usulan' => $jumlahAnggaranUsulan,
-            'total_spj'             => $jumlahSpj,
-            'total_anggaran_spj'    => $jumlahAnggaranSpj,
-        ]);
-    }
+    $jumlahSpj = (new Spj)->getStatistikJumlahPenerima(
+        $spj_where,
+        $spj_group_by,
+        $spj_between_col,
+        $spj_between_start,
+        $spj_between_end
+    );
+
+    $jumlahAnggaranSpj = (new Spj)->getStatistikJumlahAnggaran(
+        $spj_where,
+        $spj_group_by,
+        $spj_between_col,
+        $spj_between_start,
+        $spj_between_end
+    );
+
+    return response()->json([
+        'success'                => true,
+        'message'                => 'Data statistik berhasil diambil',
+        'total_usulan'           => $jumlahUsulan,
+        'total_anggaran_usulan'  => $jumlahAnggaranUsulan,
+        'total_spj'              => $jumlahSpj,
+        'total_anggaran_spj'     => $jumlahAnggaranSpj,
+    ]);
+}
 
 }

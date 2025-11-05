@@ -6,13 +6,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\Concerns\HasStatistik;
 
 class Usulan extends Model
 {
     use HasFactory;
     use SoftDeletes;
-    use HasStatistik;
 
     protected $table = 'usulan';
     protected $primaryKey = 'idusulan';
@@ -98,4 +96,75 @@ class Usulan extends Model
     {
         return $this->anggaran_disetujui ? 'Rp ' . number_format($this->anggaran_disetujui, 0, ',', '.') : '-';
     }
+
+    public function getStatistikQB(  $where = [],  $betweenColumn = null, $betweenStart = null, $betweenEnd = null)
+    {
+        $tanggal_obj = new \DateTime("now");
+        $awal_tahun = $tanggal_obj->format("Y") . "-01-01 00:00:00";
+        $tanggal_berjalan = $tanggal_obj->format("Y-m-d H:i:s");
+
+         // Tentukan kolom dan range between (bisa dikosongkan)
+        $kolomBetween = $betweenColumn ?? 'created_at';
+        $awalBetween = $betweenStart ?? $awal_tahun;
+        $akhirBetween = $betweenEnd ?? $tanggal_berjalan;
+
+        $query = $this::whereBetween($kolomBetween, [$awalBetween, $akhirBetween]);
+
+        if (!empty($where)) {
+            foreach ($where as $key => $value) {
+                if (is_array($value)) {
+                    $operator = strtolower($value[0]);
+                    $val = $value[1];
+
+                    // Jika operator adalah IN atau NOT IN
+                    if ($operator === 'in') {
+                        $query->whereIn($key, $val);
+                    } elseif ($operator === 'not in') {
+                        $query->whereNotIn($key, $val);
+                    } else {
+                        // fallback ke where biasa
+                        $query->where($key, $value[0], $value[1]);
+                    }
+                } else {
+                    $query->where($key, $value);
+                }
+            }
+        }
+
+        return $query;
+    }
+
+    public function getStatistikJumlahPenerima(
+        $where = [],
+        $groupBy = null,
+        $betweenColumn = null,
+        $betweenStart = null,
+        $betweenEnd = null
+    ) {
+        $query = $this->getStatistikQB($where, $betweenColumn, $betweenStart, $betweenEnd);
+
+        if ($groupBy) $query->groupBy($groupBy);
+
+        return $query->count();
+    }
+
+    public function getStatistikJumlahAnggaran(
+        $where = [],
+        $groupBy = null,
+        $betweenColumn = null,
+        $betweenStart = null,
+        $betweenEnd = null
+    ) {
+        $query = $this->getStatistikQB($where, $betweenColumn, $betweenStart, $betweenEnd)
+            ->selectRaw('
+                SUM(anggaran_disetujui) as total_anggaran_disetujui,
+                SUM(anggaran_usulan)    as total_anggaran_usulan
+            ');
+
+        if ($groupBy) $query->groupBy($groupBy);
+
+        return $query->get();
+    }
+
+
 }
