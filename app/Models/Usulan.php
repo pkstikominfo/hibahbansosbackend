@@ -6,11 +6,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\Concerns\HasStatistik;
 
 class Usulan extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use HasStatistik;
 
     protected $table = 'usulan';
     protected $primaryKey = 'idusulan';
@@ -29,6 +31,13 @@ class Usulan extends Model
         'iddesa',
         'nama'
     ];
+
+    protected array $statSumColumns = [
+        'anggaran_disetujui' => 'total_anggaran_disetujui',
+        'anggaran_usulan'    => 'total_anggaran_usulan',
+    ];
+
+    protected ?string $statDefaultBetweenColumn = 'created_at';
 
     public $timestamps = true;
 

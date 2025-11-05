@@ -5,13 +5,26 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\HasStatistik;
 
 class Spj extends Model
 {
     use HasFactory;
+    use HasStatistik;
 
     protected $table = 'spj';
     protected $primaryKey = 'idspj';
+
+    protected array $statSumColumns = [
+        // sesuaikan dengan kolom di tabel SPJ-mu
+        'anggaran_disetujui' => 'total_anggaran_disetujui',
+        'anggaran_usulan'    => 'total_anggaran_usulan',
+        // atau misal:
+        // 'nilai_spj_disetujui' => 'total_spj_disetujui',
+        // 'nilai_spj_usulan'    => 'total_spj_usulan',
+    ];
+
+    protected ?string $statDefaultBetweenColumn = 'created_at';
 
     protected $fillable = [
         'idusulan',
