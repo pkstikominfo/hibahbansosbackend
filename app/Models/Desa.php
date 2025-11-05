@@ -106,6 +106,7 @@ class Desa extends Model
     public function usulan()
     {
         return $this->hasMany(Usulan::class, 'iddesa', 'iddesa');
+    }
     /**
      * Check apakah desa memiliki koordinat.
      */

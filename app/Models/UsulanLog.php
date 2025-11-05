@@ -30,7 +30,7 @@ class UsulanLog extends Model
     // Relasi ke user
     public function user()
     {
-        return $this->belongsTo(User::class, 'iduser', 'iduser');
+        return $this->belongsTo(User::class, 'iduser', 'id');
     }
 
     // Cast tanggal
