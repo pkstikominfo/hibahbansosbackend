@@ -67,10 +67,14 @@ class StatistikController
     return response()->json([
         'success'                => true,
         'message'                => 'Data statistik berhasil diambil',
+        'usulan'                 => [
         'total_usulan'           => $jumlahUsulan,
         'total_anggaran_usulan'  => $jumlahAnggaranUsulan,
-        'total_spj'              => $jumlahSpj,
-        'total_anggaran_spj'     => $jumlahAnggaranSpj,
+         ],
+         'spj'                   => [
+            'total_spj'              => $jumlahSpj,
+            'total_anggaran_spj'     => $jumlahAnggaranSpj,
+        ],
     ]);
 }
 
