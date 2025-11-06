@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Usulan;
+use App\Models\Kecamatan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Throwable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 
 use function Laravel\Prompts\error;
 
@@ -29,6 +31,9 @@ class UsulanController
                 ->orWhere('anggaran_disetujui', 'like', "%{$search}%")
                 ->orWhere('nama', 'like', "%{$search}%")
                 ->orWhere('status', 'like', "%{$search}%")
+                ->orWhere('no_sk', 'like', "%{$search}%")
+                ->orWhere('nama_lembaga', 'like', "%{$search}%")
+                ->orWhere('created_at', 'like', "%{$search}%")
                 ->orWhereHas('subJenisBantuan', fn($qq) => $qq->where('namasubjenis', 'like', "%{$search}%"))
                 ->orWhereHas('kategori', fn($qq) => $qq->where('namakategori', 'like', "%{$search}%"))
                 ->orWhereHas('opd', fn($qq) => $qq->where('nama_opd', 'like', "%{$search}%"))
@@ -43,7 +48,7 @@ class UsulanController
         // kolom langsung di tabel usulan
         $directSorts = [
             'idusulan', 'judul', 'anggaran_usulan', 'anggaran_disetujui',
-            'email', 'nohp', 'status', 'nama'
+            'email', 'nohp', 'status', 'nama', 'no_sk', 'nama_lembaga', 'created_at'
         ];
 
         // mapping sort relasi => [table, column, local_key, foreign_key]
@@ -106,45 +111,48 @@ class UsulanController
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+   public function store(Request $request)
     {
-         try {
-          $validated = $request->validate([
+        try {
+            $validated = $request->validate([
                 'judul'              => ['required', 'string', 'max:255'],
                 'anggaran_usulan'    => ['required', 'integer', 'min:0'],
                 'anggaran_disetujui' => ['required', 'integer', 'min:0'],
-
-                // file max 2MB
                 'file_persyaratan'   => ['required', 'file', 'max:2048'],
-
                 'email'              => ['required', 'email', 'max:50'],
                 'nohp'               => ['required', 'string', 'max:15'],
                 'nama'               => ['required', 'string', 'max:100'],
-
-                // ✅ ENUM status
                 'status'             => ['required', Rule::in(['diusulkan', 'disetujui'])],
-
-                // ✅ FK harus exist
-                // idsubjenisbantuan → tabel sub_jenis_bantuan (kolom idsubjenisbantuan)
                 'idsubjenisbantuan'  => ['required', 'integer', 'exists:sub_jenis_bantuan,idsubjenisbantuan'],
-
-                // idkategori → tabel kategori (kolom idkategori)
                 'idkategori'         => ['required', 'integer', 'exists:kategori,idkategori'],
-
-                // iddesa → tabel desa (kolom iddesa)
                 'iddesa'             => ['required', 'integer', 'exists:desa,iddesa'],
+                'kode_opd'           => ['string', 'exists:opd,kode_opd'],
+                'no_sk'              => [
+                    'required',
+                    'string',
+                    'max:75',
+                    // ✅ custom rule: hanya boleh 1x per tahun
+                    function ($attribute, $value, $fail) {
+                        $tahunSekarang = date('Y');
+                        $ada = Usulan::where('no_sk', $value)
+                            ->whereYear('created_at', $tahunSekarang)
+                            ->exists();
 
-                // kode_opd → tabel opd (kolom kode_opd) — biasanya string
-                'kode_opd'           => ['required', 'string', 'exists:opd,kode_opd'],
+                        if ($ada) {
+                            $fail("Nomor SK $value sudah digunakan pada tahun $tahunSekarang.");
+                        }
+                    },
+                ],
+                'nama_lembaga'       => ['required', 'string', 'max:75'],
             ]);
 
+            // ===== Simpan file
             $file = $request->file('file_persyaratan');
             $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('uploads', $filename, 'public'); // simpan ke storage/app/public/uploads
+            $path = $file->storeAs('uploads', $filename, 'public');
+            $validated['file_persyaratan'] = $filename;
 
-            // masukkan nama atau path file ke data yang akan disimpan
-            $validated['file_persyaratan'] = $filename; // atau: Storage::url($path) jika ingin menyimpan URL publik
-
+            // ===== Simpan data
             $usulan = Usulan::create($validated);
             log_usulan(['idusulan' => $usulan->idusulan]);
 
@@ -188,10 +196,11 @@ class UsulanController
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, String $id)
+   public function update(Request $request, string $id)
     {
-          try {
+        try {
             $usulan = Usulan::findOrFail($id);
+
             $validated = $request->validate([
                 'judul'              => ['sometimes', 'string', 'max:255'],
                 'anggaran_usulan'    => ['sometimes', 'integer', 'min:0'],
@@ -199,16 +208,37 @@ class UsulanController
                 'file_persyaratan'   => ['sometimes', 'file', 'max:2048'],
                 'email'              => ['sometimes', 'email', 'max:50'],
                 'nohp'               => ['sometimes', 'string', 'max:15'],
-                'nama'               => ['sometimes', 'string', 'max:50'],
+                'nama'               => ['sometimes', 'string', 'max:100'],
                 'status'             => ['sometimes', Rule::in(['diusulkan', 'disetujui'])],
                 'idsubjenisbantuan'  => ['sometimes', 'integer', 'exists:sub_jenis_bantuan,idsubjenisbantuan'],
                 'idkategori'         => ['sometimes', 'integer', 'exists:kategori,idkategori'],
                 'iddesa'             => ['sometimes', 'integer', 'exists:desa,iddesa'],
                 'kode_opd'           => ['sometimes', 'string', 'exists:opd,kode_opd'],
+                'nama_lembaga'      => ['sometimes', 'string', 'max:100'],
+
+                // ✅ Validasi: no_sk hanya boleh 1x per tahun (kecuali record ini sendiri)
+                'no_sk' => [
+                    'sometimes',
+                    'string',
+                    'max:75',
+                    function ($attribute, $value, $fail) use ($usulan, $request) {
+                        // Tahun yang dipakai untuk pembatasan (umumnya tahun berjalan)
+                        $tahun = date('Y');
+
+                        $exists = Usulan::where('no_sk', $value)
+                            ->whereYear('created_at', $tahun)
+                            ->where('idusulan', '!=', $usulan->idusulan) // abaikan record yang sedang diupdate
+                            ->exists();
+
+                        if ($exists) {
+                            $fail("Nomor SK {$value} sudah digunakan pada tahun {$tahun}.");
+                        }
+                    },
+                ],
             ]);
 
+            // ==== Handle file jika diupload ulang
             if ($request->hasFile('file_persyaratan')) {
-                // hapus file lama jika ada
                 $oldFile = (string) $usulan->file_persyaratan;
                 if ($oldFile && Storage::exists('public/uploads/' . $oldFile)) {
                     Storage::delete('public/uploads/' . $oldFile);
@@ -222,12 +252,13 @@ class UsulanController
 
             $usulan->update($validated);
             log_usulan(['idusulan' => $usulan->idusulan]);
+
             return response()->json([
                 'message' => 'Usulan berhasil diperbarui',
                 'data'    => $usulan->fresh(),
             ], 200);
 
-        } catch (Throwable|ModelNotFoundException $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Gagal memperbarui layanan',
@@ -236,11 +267,11 @@ class UsulanController
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(String $id)
-    {
+/**
+ * Remove the specified resource from storage.
+ */
+public function destroy(String $id)
+{
         try {
             $usulan = Usulan::findOrFail($id);
             // hapus file dari storage jika ada
@@ -292,4 +323,184 @@ class UsulanController
             'data'    => $logs,
         ], 200);
     }
+
+     public function getSebaranAnggaranDisetujui(Request $request)
+    {
+        $level = $request->input('level', 'kecamatan'); // default
+        $betweenCol = $request->input('between_column', 'created_at');
+        [$start, $end] = $this->resolveBetweenRange(
+            $request->input('between_start'),
+            $request->input('between_end')
+        );
+
+        // Filter khusus sesuai level
+        $idKec  = $request->input('idkecamatan');
+        $idDesa = $request->input('iddesa');
+        $idSub  = $request->input('idsubjenisbantuan');
+
+        // Filter bebas (opsional)
+        $whereCol = $request->input('where_column');
+        $whereVal = $request->input('where_value');
+
+        // Switch per level
+        switch ($level) {
+            case 'desa':
+                $rows = DB::table('usulan as u')
+                    ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
+                    ->select(
+                        'd.iddesa',
+                        'd.namadesa',
+                        DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
+                    )
+                    ->when($idDesa, fn($q) => $q->where('d.iddesa', $idDesa))
+                    ->when($idKec,  fn($q) => $q->where('d.idkecamatan', $idKec))
+                    ->when($start && $end, fn($q) => $q->whereBetween("u.$betweenCol", [$start, $end]))
+                    ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
+                        if (is_array($whereVal)) {
+                            $q->whereIn($whereCol, $whereVal);
+                        } else {
+                            $q->where($whereCol, $whereVal);
+                        }
+                    })
+                    ->groupBy('d.iddesa', 'd.namadesa')
+                    ->orderBy('d.namadesa')
+                    ->get();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Sebaran anggaran disetujui berdasarkan kategori: desa',
+                    'data'    => $rows->map(function ($r) {
+                        return [
+                            'iddesa'                   => (int) $r->iddesa,
+                            'namadesa'                 => $r->namadesa,
+                            'total_anggaran_disetujui' => (int) $r->total_anggaran_disetujui,
+                        ];
+                    }),
+                ]);
+
+            case 'subjenisbantuan':
+                $rows = DB::table('usulan as u')
+                    ->join('sub_jenis_bantuan as s', 's.idsubjenisbantuan', '=', 'u.idsubjenisbantuan')
+                    ->select(
+                        's.idsubjenisbantuan',
+                        's.namasubjenis',
+                        DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
+                    )
+                    ->when($idSub, fn($q) => $q->where('s.idsubjenisbantuan', $idSub))
+                    ->when($start && $end, fn($q) => $q->whereBetween("u.$betweenCol", [$start, $end]))
+                    ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
+                        if (is_array($whereVal)) {
+                            $q->whereIn($whereCol, $whereVal);
+                        } else {
+                            $q->where($whereCol, $whereVal);
+                        }
+                    })
+                    ->groupBy('s.idsubjenisbantuan', 's.namasubjenis')
+                    ->orderBy('s.namasubjenis')
+                    ->get();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Sebaran anggaran disetujui berdasarkan kategori: subjenisbantuan',
+                    'data'    => $rows->map(function ($r) {
+                        return [
+                            'idsubjenisbantuan'        => (int) $r->idsubjenisbantuan,
+                            'namasubjenis'             => $r->namasubjenis,
+                            'total_anggaran_disetujui' => (int) $r->total_anggaran_disetujui,
+                        ];
+                    }),
+                ]);
+
+            case 'kecamatan':
+            default:
+                // Ambil total per kecamatan
+                $kecamatanRows = DB::table('usulan as u')
+                    ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
+                    ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
+                    ->select(
+                        'k.idkecamatan',
+                        'k.namakecamatan',
+                        DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
+                    )
+                    ->when($idKec, fn($q) => $q->where('k.idkecamatan', $idKec))
+                    ->when($start && $end, fn($q) => $q->whereBetween("u.$betweenCol", [$start, $end]))
+                    ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
+                        if (is_array($whereVal)) {
+                            $q->whereIn($whereCol, $whereVal);
+                        } else {
+                            $q->where($whereCol, $whereVal);
+                        }
+                    })
+                    ->groupBy('k.idkecamatan', 'k.namakecamatan')
+                    ->orderBy('k.namakecamatan')
+                    ->get();
+
+                // Ambil anak: total per desa (untuk kecamatan terfilter)
+                $desaRows = DB::table('usulan as u')
+                    ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
+                    ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
+                    ->select(
+                        'k.idkecamatan',
+                        'd.iddesa',
+                        'd.namadesa',
+                        DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
+                    )
+                    ->when($idKec, fn($q) => $q->where('k.idkecamatan', $idKec))
+                    ->when($start && $end, fn($q) => $q->whereBetween("u.$betweenCol", [$start, $end]))
+                    ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
+                        if (is_array($whereVal)) {
+                            $q->whereIn($whereCol, $whereVal);
+                        } else {
+                            $q->where($whereCol, $whereVal);
+                        }
+                    })
+                    ->groupBy('k.idkecamatan', 'd.iddesa', 'd.namadesa')
+                    ->orderBy('d.namadesa')
+                    ->get()
+                    ->groupBy('idkecamatan');
+
+                $data = $kecamatanRows->map(function ($kec) use ($desaRows) {
+                    $anakDesa = collect($desaRows->get($kec->idkecamatan, []))->map(function ($d) {
+                        return [
+                            'iddesa'                   => (int) $d->iddesa,
+                            'namadesa'                 => $d->namadesa,
+                            'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
+                        ];
+                    })->values();
+
+                    return [
+                        'idkecamatan'              => (int) $kec->idkecamatan,
+                        'namakecamatan'            => $kec->namakecamatan,
+                        'total_anggaran_disetujui' => (int) $kec->total_anggaran_disetujui,
+                        'desa'                     => $anakDesa,
+                    ];
+                })->values();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Sebaran anggaran disetujui berdasarkan kategori: kecamatan',
+                    'data'    => $data,
+                ]);
+        }
+    }
+
+    /**
+     * Default range: YTD (awal tahun - sekarang) bila salah satu/begitu saja.
+     */
+    private function resolveBetweenRange(?string $start, ?string $end): array
+    {
+        if (!$start && !$end) {
+            $y = now()->format('Y');
+            return ["$y-01-01 00:00:00", now()->format('Y-m-d H:i:s')];
+        }
+        if ($start && !$end) {
+            return [$start, now()->format('Y-m-d H:i:s')];
+        }
+        if (!$start && $end) {
+            $y = now()->format('Y');
+            return ["$y-01-01 00:00:00", $end];
+        }
+        return [$start, $end];
+    }
+
 }

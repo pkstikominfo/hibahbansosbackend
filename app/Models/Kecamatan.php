@@ -103,4 +103,16 @@ class Kecamatan extends Model
     {
         $this->attributes['namakecamatan'] = strtolower($value);
     }
+
+     public function usulan()
+    {
+        return $this->hasManyThrough(
+            Usulan::class,    // model tujuan
+            Desa::class,      // perantara
+            'idkecamatan',    // FK di Desa yang refer ke Kecamatan
+            'iddesa',         // FK di Usulan yang refer ke Desa
+            'idkecamatan',    // PK Kecamatan
+            'iddesa'          // PK Desa
+        );
+    }
 }

@@ -29,7 +29,9 @@ class Usulan extends Model
         'kode_opd',
         'status',
         'iddesa',
-        'nama'
+        'nama',
+        'no_sk',
+        'nama_lembaga'
     ];
 
     protected array $statSumColumns = [
