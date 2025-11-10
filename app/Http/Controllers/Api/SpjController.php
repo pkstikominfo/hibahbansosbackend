@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 
 
 class SpjController
@@ -26,6 +27,7 @@ class SpjController
             $query->where(function ($q) use ($search) {
                 $q->where('idspj', 'like', "%{$search}%")
                 ->orWhere('realisasi', 'like', "%{$search}%")
+                ->orWhere('created_at', 'like', "%{$search}%")
                 ->whereHas('usulan', fn($qq) => $qq->where('judul', 'like', "%{$search}%"));
             });
         }
@@ -36,7 +38,7 @@ class SpjController
 
         // kolom langsung di tabel usulan
         $directSorts = [
-            'idspj', 'realisasi'
+            'idspj', 'realisasi', 'created_at'
         ];
 
         // mapping sort relasi => [table, column, local_key, foreign_key]
@@ -45,7 +47,7 @@ class SpjController
             'judul' => ['table' => 'usulan', 'column' => 'judul', 'local_key' => 'idusulan', 'foreign_key' => 'idusulan']];
 
         if (in_array($sortBy, $directSorts)) {
-            $query->orderBy("usulan.$sortBy", $sortDir);
+            $query->orderBy("spj.$sortBy", $sortDir);
         } elseif (array_key_exists($sortBy, $relationSorts)) {
             [$table, $column, $local, $foreign] = [
                 $relationSorts[$sortBy]['table'],
@@ -67,12 +69,139 @@ class SpjController
         $perPage = (int) $request->input('per_page', 10);
         $page    = (int) $request->input('page', 1);
 
+        $spj = $query->paginate($perPage, ['*'], 'page', $page);
+
+        // 🖼️ absolute URL untuk file
+        $spj->getCollection()->transform(function ($item) {
+            $item->file_persyaratan = $item->file_persyaratan
+                ? asset("storage/uploads/{$item->file_persyaratan}")
+                : null;
+            return $item;
+        });
+
+        // 🖼️ absolute URL untuk file
+        $spj->getCollection()->transform(function ($item) {
+            $item->foto = $item->foto
+                ? asset("storage/uploads/{$item->foto}")
+                : null;
+            return $item;
+        });
+
+        return response()->json([
+            'data' => $spj->items(),
+            'meta' => [
+                'page'        => $spj->currentPage(),
+                'per_page'    => $spj->perPage(),
+                'total'       => $spj->total(),
+                'total_pages' => $spj->lastPage(),
+                'sort_by'     => $sortBy,
+                'sort_dir'    => $sortDir,
+                'search'      => $search ?? null,
+            ],
+        ]);
+    }
+
+    public function detailBantuan(Request $request)
+    {
+        $query = Spj::query()
+            ->select(
+                'spj.idspj',
+                'spj.realisasi',
+                'spj.foto',
+                'spj.created_at',
+                DB::raw('(SELECT nama FROM usulan WHERE usulan.idusulan = spj.idusulan LIMIT 1) as nama_usulan')
+            );
+
+        // 🔍 Search
+        if ($search = $request->input('q')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('spj.idspj', 'like', "%{$search}%")
+                    ->orWhere('spj.created_at', 'like', "%{$search}%")
+                    ->orWhere(DB::raw('(SELECT nama FROM usulan WHERE usulan.idusulan = spj.idusulan LIMIT 1)'), 'like', "%{$search}%");
+            });
+        }
+
+        // 🔽 Sorting
+        $sortBy  = $request->input('sort_by', 'idspj');
+        $sortDir = $request->input('sort_dir', 'asc');
+
+        if (in_array($sortBy, ['idspj', 'realisasi', 'created_at'])) {
+            $query->orderBy("spj.$sortBy", $sortDir);
+        } elseif ($sortBy === 'nama') {
+            $query->orderBy(DB::raw('(SELECT nama FROM usulan WHERE usulan.idusulan = spj.idusulan LIMIT 1)'), $sortDir);
+        }
+
+
+
+        // 📄 Pagination
+        $perPage = (int) $request->input('per_page', 10);
+        $page    = (int) $request->input('page', 1);
+
+        $spj = $query->paginate($perPage, ['*'], 'page', $page);
+
+           // 🖼️ absolute URL untuk file
+        $spj->getCollection()->transform(function ($item) {
+            $item->foto = $item->foto
+                ? asset("storage/uploads/{$item->foto}")
+                : null;
+            return $item;
+        });
+
+        return response()->json([
+            'data' => $spj->items(),
+            'meta' => [
+                'page'        => $spj->currentPage(),
+                'per_page'    => $spj->perPage(),
+                'total'       => $spj->total(),
+                'total_pages' => $spj->lastPage(),
+                'sort_by'     => $sortBy,
+                'sort_dir'    => $sortDir,
+                'search'      => $search ?? null,
+            ],
+        ]);
+    }
+
+
+    public function feedBantuan(Request $request)
+    {
+        $query = Spj::query()->select('spj.idspj' ,'spj.foto', 'spj.created_at');
+
+        // 🔍 Search global (tetap punyamu)
+        if ($search = $request->input('q')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('created_at', 'like', "%{$search}%");
+            });
+        }
+
+        // 🔽 Sorting
+        $sortBy  = $request->input('sort_by', 'created_at');
+        $sortDir = $request->input('sort_dir', 'asc');
+
+        // kolom langsung di tabel usulan
+        $directSorts = [
+             'created_at'
+        ];
+
+
+
+
+        if (in_array($sortBy, $directSorts)) {
+            $query->orderBy("spj.$sortBy", $sortDir);
+        }  else {
+            // fallback aman
+            $query->orderBy('idspj', 'asc');
+        }
+
+        // 📄 Pagination
+        $perPage = (int) $request->input('per_page', 10);
+        $page    = (int) $request->input('page', 1);
+
         $usulan = $query->paginate($perPage, ['*'], 'page', $page);
 
         // 🖼️ absolute URL untuk file
         $usulan->getCollection()->transform(function ($item) {
-            $item->file_persyaratan = $item->file_persyaratan
-                ? asset("storage/uploads/{$item->file_persyaratan}")
+            $item->foto = $item->foto
+                ? asset("storage/uploads/{$item->foto}")
                 : null;
             return $item;
         });

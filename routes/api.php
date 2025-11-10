@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DesaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsulanController;
 use App\Http\Controllers\Api\KecamatanController;
+use App\Http\Controllers\Api\StatistikController;
 
 
 // Public routes (tanpa authentication)
@@ -28,9 +29,6 @@ Route::apiResource('desa', DesaController::class);
 Route::get('/desa-kecamatan/{idKecamatan}', [DesaController::class, 'getByKecamatan']);
 Route::get('/desa-search', [DesaController::class, 'search']);
 Route::get('/desa-paginated', [DesaController::class, 'paginated']);
-Route::get('/desa-by-coordinates', [DesaController::class, 'getByCoordinates']);
-Route::get('/desa-dengan-koordinat', [DesaController::class, 'denganKoordinat']);
-Route::put('/desa/{id}/koordinat', [DesaController::class, 'updateKoordinat']);
 
 
 // Routes untuk OPD
@@ -40,6 +38,7 @@ Route::get('/opd-search', [OpdController::class, 'search']);
 Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
 Route::get('/opd-paginated', [OpdController::class, 'paginated']);
 
+<<<<<<< HEAD
 // Routes untuk User
 Route::apiResource('users', UserController::class);
 // Additional routes untuk User
@@ -50,7 +49,17 @@ Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
 
 // Routes untuk Usulan
 Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
+=======
+// API Usulan
+Route::apiResource('usulan', UsulanController::class);
+>>>>>>> ed4f08ac37bb8e24d4d73691a3df4de9b909eedf
 Route::apiResource('spj', SpjController::class);
+Route::get('/feed-bantuan', [SpjController::class, 'feedBantuan']);
+Route::get('/detail-bantuan', [SpjController::class, 'detailBantuan']);
+
+Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
+Route::get('/statistik', [StatistikController::class, 'getStatistik']);
+Route::get('/sebaran-data', [UsulanController::class, 'getSebaranAnggaranDisetujui']);
 
 // Protected routes (perlu authentication)
 Route::middleware('auth:sanctum')->group(function () {

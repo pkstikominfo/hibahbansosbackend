@@ -25,11 +25,12 @@ return new class extends Migration
             $table->enum('status', ['diusulkan', 'disetujui'])->nullable();
             $table->softDeletes(); // Add this line for soft delete
             $table->string('nama', 75);
+            $table->string('no_sk', 75)->comment('Nilai Berupa NO SK atau NO KTP');
+            $table->string('nama_lembaga', 75);
 
             $table->unsignedBigInteger('iddesa')->references('iddesa')->on('desa');
             $table->foreign('idsubjenisbantuan')->references('idsubjenisbantuan')->on('sub_jenis_bantuan');
             $table->foreign('idkategori')->references('idkategori')->on('kategori');
-            $table->foreign('kode_opd')->references('kode_opd')->on('opd');
             $table->timestamps();
         });
     }
