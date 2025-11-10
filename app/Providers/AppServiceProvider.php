@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate;
+use App\Models\Usulan;
+use App\Policies\UsulanPolicy;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,5 +25,6 @@ class AppServiceProvider extends ServiceProvider
     {
         //
         Schema::defaultStringLength(191);
+        Gate::policy(Usulan::class, UsulanPolicy::class);
     }
 }

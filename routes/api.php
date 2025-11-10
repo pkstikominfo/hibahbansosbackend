@@ -47,7 +47,8 @@ Route::get('/users-search', [UserController::class, 'search']);
 Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
 Route::get('/users-paginated', [UserController::class, 'paginated']);
 Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
-Route::apiResource('usulan', UsulanController::class);
+
+// Routes untuk Usulan
 Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
 Route::apiResource('spj', SpjController::class);
 
@@ -59,26 +60,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::put('/user/change-password', [AuthController::class, 'changePassword']);
 
-    // // CRUD routes yang sudah ada
-    // Route::apiResource('users', UserController::class);
-    // Route::apiResource('kecamatan', KecamatanController::class);
-    // Route::apiResource('desa', DesaController::class);
-    // Route::apiResource('opd', OpdController::class);
+    Route::prefix('usulan')->group(function () {
+        // Basic CRUD
+        Route::get('/', [UsulanController::class, 'index']);
+        Route::post('/', [UsulanController::class, 'store']);
+        Route::get('/{id}', [UsulanController::class, 'show']);
+        Route::put('/{id}', [UsulanController::class, 'update']);
+        Route::delete('/{id}', [UsulanController::class, 'destroy']);
 
-    // // Additional routes
-    // Route::get('/users-search', [UserController::class, 'search']);
-    // Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
-    // Route::get('/users-paginated', [UserController::class, 'paginated']);
-    // Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
+        // Special actions
+        Route::post('/{id}/assign', [UsulanController::class, 'assignOpd']);
+        Route::post('/{id}/approve', [UsulanController::class, 'approve']);
 
-    // Route::get('/desa-kecamatan/{idKecamatan}', [DesaController::class, 'getByKecamatan']);
-    // Route::get('/desa-search', [DesaController::class, 'search']);
-    // Route::get('/desa-paginated', [DesaController::class, 'paginated']);
-    // Route::get('/desa-by-coordinates', [DesaController::class, 'getByCoordinates']);
-    // Route::get('/desa-dengan-koordinat', [DesaController::class, 'denganKoordinat']);
-    // Route::put('/desa/{id}/koordinat', [DesaController::class, 'updateKoordinat']);
-
-    // Route::get('/opd-search', [OpdController::class, 'search']);
-    // Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
-    // Route::get('/opd-paginated', [OpdController::class, 'paginated']);
+        // Logs
+        Route::get('/logs/all', [UsulanController::class, 'getLogs']);
+    });
 });
