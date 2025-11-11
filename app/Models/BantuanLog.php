@@ -6,17 +6,18 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class UsulanLog extends Model
+class BantuanLog extends Model
 {
     use HasFactory;
 
-    protected $table = 'usulan_log';
+    protected $table = 'bantuan_log';
     protected $primaryKey = 'idlog';
 
     protected $fillable = [
-        'idusulan',
+        'id_fk',
         'iduser',
         'tanggal',
+        'tipe',
     ];
 
     public $timestamps = false;
@@ -24,7 +25,12 @@ class UsulanLog extends Model
     // Relasi ke usulan
     public function usulan()
     {
-        return $this->belongsTo(Usulan::class, 'idusulan', 'idusulan');
+        return $this->belongsTo(Usulan::class, 'id_fk', 'idusulan');
+    }
+
+    public function spj()
+    {
+        return $this->belongsTo(Spj::class, 'id_fk', 'idspj');
     }
 
     // Relasi ke user

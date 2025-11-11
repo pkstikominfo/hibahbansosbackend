@@ -74,9 +74,9 @@ class Usulan extends Model
     }
 
     // Relasi ke usulan_log
-    public function usulanLogs()
+    public function bantuanLogs()
     {
-        return $this->hasMany(UsulanLog::class, 'idusulan', 'idusulan');
+        return $this->hasMany(BantuanLog::class, 'id_fk', 'idusulan');
     }
 
     // Scope untuk status

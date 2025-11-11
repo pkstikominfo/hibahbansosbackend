@@ -145,4 +145,9 @@ public function getStatistikJumlahAnggaran($where = [], $groupBy = null, $betwee
 
     return $qb->get();
 }
+
+public function bantuanLogs()
+    {
+        return $this->hasMany(BantuanLog::class, 'id_fk', 'idspj');
+    }
 }

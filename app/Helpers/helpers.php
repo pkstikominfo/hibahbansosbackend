@@ -9,15 +9,15 @@ if (!function_exists('format_rupiah')) {
         return 'Rp ' . number_format($angka, 0, ',', '.');
     }
 }
-if (!function_exists('log_usulan')) {
-    function log_usulan($data)
+if (!function_exists('log_bantuan')) {
+    function log_bantuan($data)
     {
         $id_user = Auth::check() ? Auth::user()->iduser : null;
         $data_insert = [
-            'idusulan' => $data['idusulan'],
+            'id_fk' => $data['id_fk'],
             'iduser' => $id_user,
             'tanggal' => now(),
         ];
-        \App\Models\UsulanLog::create($data_insert);
+        \App\Models\BantuanLog::create($data_insert);
     }
 }

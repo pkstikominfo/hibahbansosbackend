@@ -117,7 +117,7 @@ class UsulanController
             $validated = $request->validate([
                 'judul'              => ['required', 'string', 'max:255'],
                 'anggaran_usulan'    => ['required', 'integer', 'min:0'],
-                'anggaran_disetujui' => ['required', 'integer', 'min:0'],
+                'anggaran_disetujui' => ['nullable', 'integer', 'min:0'],
                 'file_persyaratan'   => ['required', 'file', 'max:2048'],
                 'email'              => ['required', 'email', 'max:50'],
                 'nohp'               => ['required', 'string', 'max:15'],
@@ -154,7 +154,7 @@ class UsulanController
 
             // ===== Simpan data
             $usulan = Usulan::create($validated);
-            log_usulan(['idusulan' => $usulan->idusulan]);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
 
             return response()->json([
                 'code'    => 'success',
@@ -251,7 +251,7 @@ class UsulanController
             }
 
             $usulan->update($validated);
-            log_usulan(['idusulan' => $usulan->idusulan]);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
 
             return response()->json([
                 'message' => 'Usulan berhasil diperbarui',
@@ -280,7 +280,7 @@ public function destroy(String $id)
             }
 
             $usulan->delete();
-            log_usulan(['idusulan' => $usulan->idusulan]);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
             return response()->json([
                 'code'    => 'success',
                 'message' => 'Usulan berhasil dihapus',
@@ -295,27 +295,31 @@ public function destroy(String $id)
     }
 
     /**
-     * Get log_usulan by tanggal, id_user, or id_usulan and their values.
+     * Get log_bantuan by tanggal, id_user, or id_usulan and their values.
      * Example query: /api/usulan/logs?tanggal=2024-06-01&id_user=5&id_usulan=10
      */
     public function getLogs(Request $request)
     {
-        $query = \DB::table('usulan_log')
-            ->join('usulan', 'usulan_log.idusulan', '=', 'usulan.idusulan')
-            ->leftJoin('users', 'usulan_log.iduser', '=', 'users.id')
-            ->select('usulan_log.*', 'usulan.judul as judul_usulan', 'users.name as nama_user');
+        $query = \DB::table('bantuan_log')
+            ->leftJoin('usulan', 'bantuan_log.id_fk', '=', 'usulan.idusulan')
+            ->leftJoin('spj', 'bantuan_log.id_fk', '=', 'spj.idspj')
+            ->leftJoin('users', 'bantuan_log.iduser', '=', 'users.id')
+            ->select('bantuan_log.*', 'usulan.judul as judul_usulan', 'users.name as nama_user');
+        if ($request->filled('jenis')) {
+            $query->where('bantuan_log.jenis', $request->input('jenis'));
+        }
 
         if ($request->filled('tanggal')) {
-            $query->whereDate('usulan_log.tanggal', $request->input('tanggal'));
+            $query->whereDate('bantuan_log.tanggal', $request->input('tanggal'));
         }
         if ($request->filled('iduser')) {
-            $query->where('usulan_log.iduser', $request->input('iduser'));
+            $query->where('bantuan_log.iduser', $request->input('iduser'));
         }
-        if ($request->filled('idusulan')) {
-            $query->where('usulan_log.idusulan', $request->input('idusulan'));
+        if ($request->filled('id_fk')) {
+            $query->where('bantuan_log.id_fk', $request->input('id_fk'));
         }
 
-        $logs = $query->orderByDesc('usulan_log.tanggal')->get();
+        $logs = $query->orderByDesc('bantuan_log.tanggal')->get();
 
         return response()->json([
             'code'    => 'success',

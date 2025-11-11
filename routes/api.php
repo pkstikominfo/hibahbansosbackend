@@ -41,10 +41,10 @@ Route::get('/opd-paginated', [OpdController::class, 'paginated']);
 // API Usulan
 Route::apiResource('usulan', UsulanController::class);
 Route::apiResource('spj', SpjController::class);
+
 Route::get('/feed-bantuan', [SpjController::class, 'feedBantuan']);
 Route::get('/detail-bantuan', [SpjController::class, 'detailBantuan']);
-
-Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
+Route::get('/log-bantuan', [UsulanController::class, 'getLogs']);
 Route::get('/statistik', [StatistikController::class, 'getStatistik']);
 Route::get('/sebaran-data', [UsulanController::class, 'getSebaranAnggaranDisetujui']);
 
