@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Opd;
-use Illuminate\Http\JsonResponse;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
@@ -41,7 +42,7 @@ class UserController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'username' => 'required|string|max:10|unique:users,username',
+                'username' => 'required|string|max:15|unique:users,username',
                 'password' => 'required|string|min:6',
                 'name' => 'required|string|max:75',
                 'email' => 'required|email|max:30|unique:users,email',
@@ -86,7 +87,10 @@ class UserController extends Controller
                 ], 422);
             }
 
-            $user = User::create($validator->validated());
+            $data = $validator->validated();
+            $data['password'] = Hash::make($data['password']);
+
+            $user = User::create($data);
             $user->load('opd');
 
             return response()->json([
@@ -148,7 +152,7 @@ class UserController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
-                'username' => 'sometimes|required|string|max:10|unique:users,username,' . $id . ',id',
+                'username' => 'sometimes|required|string|max:15|unique:users,username,' . $id . ',id',
                 'password' => 'sometimes|required|string|min:6',
                 'name' => 'sometimes|required|string|max:75',
                 'email' => 'sometimes|required|email|max:30|unique:users,email,' . $id . ',id',
@@ -192,7 +196,12 @@ class UserController extends Controller
                 ], 422);
             }
 
-            $user->update($validator->validated());
+            $data = $validator->validated();
+            if (isset($data['password'])) {
+                $data['password'] = Hash::make($data['password']);
+            }
+
+            $user->update($data);
             $user->load('opd');
 
             return response()->json([
