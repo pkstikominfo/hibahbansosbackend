@@ -49,8 +49,7 @@ Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
 // Routes untuk Usulan
 Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
 // API Usulan
-Route::apiResource('usulan', UsulanController::class);
-Route::apiResource('spj', SpjController::class);
+
 
 Route::get('/feed-bantuan', [SpjController::class, 'feedBantuan']);
 Route::get('/detail-bantuan', [SpjController::class, 'detailBantuan']);
@@ -66,13 +65,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::put('/user/change-password', [AuthController::class, 'changePassword']);
 
+    Route::apiResource('usulan', UsulanController::class);
+    Route::apiResource('spj', SpjController::class);
+
     Route::prefix('usulan')->group(function () {
-        // Basic CRUD
-        Route::get('/', [UsulanController::class, 'index']);
-        Route::post('/', [UsulanController::class, 'store']);
-        Route::get('/{id}', [UsulanController::class, 'show']);
-        Route::put('/{id}', [UsulanController::class, 'update']);
-        Route::delete('/{id}', [UsulanController::class, 'destroy']);
 
         // Special actions
         Route::post('/{id}/assign', [UsulanController::class, 'assignOpd']);

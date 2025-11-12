@@ -21,12 +21,13 @@ return new class extends Migration
             $table->tinyInteger('idsubjenisbantuan');
             $table->tinyInteger('idkategori');
             $table->integer('anggaran_disetujui')->nullable();
-            $table->char('kode_opd', 10)->nullable();
-            $table->enum('status', ['diusulkan', 'disetujui'])->nullable();
+            $table->char('kode_opd', 10);
+            $table->enum('status', ['diusulkan', 'disetujui', 'diterima', 'ditolak'])->nullable();
             $table->softDeletes(); // Add this line for soft delete
             $table->string('nama', 75);
             $table->string('no_sk', 75)->comment('Nilai Berupa NO SK atau NO KTP');
             $table->string('nama_lembaga', 75);
+            $table->text('catatan_ditolak')->nullable();
 
             $table->unsignedBigInteger('iddesa')->references('iddesa')->on('desa');
             $table->foreign('idsubjenisbantuan')->references('idsubjenisbantuan')->on('sub_jenis_bantuan');

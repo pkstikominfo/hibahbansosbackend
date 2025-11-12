@@ -157,11 +157,13 @@ class UsulanController extends Controller
                 'email'              => ['required', 'email', 'max:50'],
                 'nohp'               => ['required', 'string', 'max:15'],
                 'nama'               => ['required', 'string', 'max:100'],
-                'status'             => ['required', Rule::in(['diusulkan', 'disetujui'])],
+                'status'             => ['required', Rule::in(['diusulkan', 'disetujui', 'diterima', 'ditolak'])],
                 'idsubjenisbantuan'  => ['required', 'integer', 'exists:sub_jenis_bantuan,idsubjenisbantuan'],
                 'idkategori'         => ['required', 'integer', 'exists:kategori,idkategori'],
                 'iddesa'             => ['required', 'integer', 'exists:desa,iddesa'],
-                'kode_opd'           => ['nullable', 'string', 'exists:opd,kode_opd'],
+                'kode_opd'           => ['required', 'string', 'exists:opd,kode_opd'],
+                'no_sk'           =>    ['required', 'string', 'max:150'],
+                'nama_lembaga'           =>    ['required', 'string', 'max:255'],
             ]);
 
             // ===== Simpan file
@@ -240,7 +242,6 @@ class UsulanController extends Controller
     {
         try {
             $usulan = Usulan::findOrFail($id);
-
             // ✅ Authorization check
             $this->authorize('update', $usulan);
 
@@ -252,12 +253,13 @@ class UsulanController extends Controller
                 'email'              => ['sometimes', 'email', 'max:50'],
                 'nohp'               => ['sometimes', 'string', 'max:15'],
                 'nama'               => ['sometimes', 'string', 'max:100'],
-                'status'             => ['sometimes', Rule::in(['diusulkan', 'disetujui'])],
+                'status'             => ['sometimes', Rule::in(['diusulkan', 'disetujui', 'diterima', 'ditolak'])],
                 'idsubjenisbantuan'  => ['sometimes', 'integer', 'exists:sub_jenis_bantuan,idsubjenisbantuan'],
                 'idkategori'         => ['sometimes', 'integer', 'exists:kategori,idkategori'],
                 'iddesa'             => ['sometimes', 'integer', 'exists:desa,iddesa'],
                 'kode_opd'           => ['sometimes', 'string', 'exists:opd,kode_opd'],
-                'nama_lembaga'      => ['sometimes', 'string', 'max:100'],
+                'nama_lembaga'      => ['sometimes', 'string', 'max:255'],
+                'catatan_ditolak'   => ['sometimes', 'string', 'max:500'],
 
                 // ✅ Validasi: no_sk hanya boleh 1x per tahun (kecuali record ini sendiri)
                 'no_sk' => [
@@ -427,7 +429,7 @@ class UsulanController extends Controller
 
             $validated = $request->validate([
                 'status' => ['required', Rule::in(['disetujui', 'ditolak'])],
-                'catatan' => ['nullable', 'string', 'max:500']
+                'catatan_ditolak' => ['nullable', 'string', 'max:500']
             ], [
                 'status.required' => 'Status wajib diisi',
                 'status.in' => 'Status harus disetujui atau ditolak'

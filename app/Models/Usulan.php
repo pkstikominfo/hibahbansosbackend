@@ -31,7 +31,8 @@ class Usulan extends Model
         'iddesa',
         'nama',
         'no_sk',
-        'nama_lembaga'
+        'nama_lembaga',
+        'catatan_ditolak'
     ];
 
     protected array $statSumColumns = [
