@@ -11,19 +11,19 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('usulan_log', function (Blueprint $table) {
+        Schema::create('bantuan_log', function (Blueprint $table) {
             $table->integer('idlog', true);
-            $table->integer('idusulan')->nullable();
+            $table->integer('id_fk')->nullable();
             $table->integer('iduser')->nullable();
             $table->dateTime('tanggal')->nullable();
+            $table->enum('tipe', ['usulan', 'spj'])->default('usulan');
 
-            $table->foreign('idusulan')->references('idusulan')->on('usulan');
             $table->foreign('iduser')->references('iduser')->on('users');
         });
     }
 
     public function down()
     {
-        Schema::dropIfExists('usulan_log');
+        Schema::dropIfExists('bantuan_log');
     }
 };

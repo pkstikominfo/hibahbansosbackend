@@ -164,14 +164,69 @@ class SpjController
 
     public function feedBantuan(Request $request)
     {
-        $query = Spj::query()->select('spj.idspj' ,'spj.foto', 'spj.created_at');
+        $query = Spj::query()
+    ->select(
+        'spj.idspj',
+        'spj.foto',
+        'spj.created_at',
+        'usulan.judul as judul_usulan',
+        'usulan.anggaran_disetujui',
+        'spj.realisasi',
+        'opd.nama_opd as nama_opd',
+        'sub_jenis_bantuan.namasubjenis as sub_jenis_bantuan',
+        'kategori.namakategori as kategori',
+        'desa.namadesa as nama_desa',
+        'usulan.nama as nama_pengusul'
+    )
+    ->leftJoin('usulan', 'spj.idusulan', '=', 'usulan.idusulan')
+    ->leftJoin('opd', 'usulan.kode_opd', '=', 'opd.kode_opd')
+    ->leftJoin('sub_jenis_bantuan', 'usulan.idsubjenisbantuan', '=', 'sub_jenis_bantuan.idsubjenisbantuan')
+    ->leftJoin('kategori', 'usulan.idkategori', '=', 'kategori.idkategori')
+    ->leftJoin('desa', 'usulan.iddesa', '=', 'desa.iddesa');
 
-        // 🔍 Search global (tetap punyamu)
-        if ($search = $request->input('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('created_at', 'like', "%{$search}%");
-            });
-        }
+// 🔎 Global search berdasarkan kolom yang di-select
+if ($search = trim($request->input('q'))) {
+
+    // daftar kolom yang dicari (pakai nama asli tabel)
+    $searchable = [
+        'spj.idspj',
+        'spj.created_at',
+        'usulan.judul',
+        'usulan.anggaran_disetujui',
+        'spj.realisasi',
+        'opd.nama_opd',
+        'sub_jenis_bantuan.namasubjenis',
+        'kategori.namakategori',
+        'desa.namadesa',
+        'usulan.nama',
+    ];
+
+    $query->where(function ($q) use ($search, $searchable) {
+            foreach ($searchable as $col) {
+
+                // angka (kolom numeric): pakai '=' kalau input numeric, kalau bukan jatuh ke LIKE
+                if (in_array($col, ['usulan.anggaran_disetujui', 'spj.realisasi'])) {
+                    if (is_numeric($search)) {
+                        $q->orWhere($col, '=', $search);
+                    } else {
+                        // fallback LIKE (misal user ketik "100." atau "1.000")
+                        $q->orWhere($col, 'like', "%{$search}%");
+                    }
+                    continue;
+                }
+
+                // tanggal: coba cocokkan tanggal saja + LIKE untuk fleksibel
+                if ($col === 'spj.created_at') {
+                    $q->orWhereDate('spj.created_at', $search)
+                    ->orWhere('spj.created_at', 'like', "%{$search}%");
+                    continue;
+                }
+
+                // string umum
+                $q->orWhere($col, 'like', "%{$search}%");
+            }
+        });
+}
 
         // 🔽 Sorting
         $sortBy  = $request->input('sort_by', 'created_at');
@@ -196,10 +251,10 @@ class SpjController
         $perPage = (int) $request->input('per_page', 10);
         $page    = (int) $request->input('page', 1);
 
-        $usulan = $query->paginate($perPage, ['*'], 'page', $page);
+        $spj = $query->paginate($perPage, ['*'], 'page', $page);
 
         // 🖼️ absolute URL untuk file
-        $usulan->getCollection()->transform(function ($item) {
+        $spj->getCollection()->transform(function ($item) {
             $item->foto = $item->foto
                 ? asset("storage/uploads/{$item->foto}")
                 : null;
@@ -207,12 +262,12 @@ class SpjController
         });
 
         return response()->json([
-            'data' => $usulan->items(),
+            'data' => $spj->items(),
             'meta' => [
-                'page'        => $usulan->currentPage(),
-                'per_page'    => $usulan->perPage(),
-                'total'       => $usulan->total(),
-                'total_pages' => $usulan->lastPage(),
+                'page'        => $spj->currentPage(),
+                'per_page'    => $spj->perPage(),
+                'total'       => $spj->total(),
+                'total_pages' => $spj->lastPage(),
                 'sort_by'     => $sortBy,
                 'sort_dir'    => $sortDir,
                 'search'      => $search ?? null,
@@ -255,7 +310,7 @@ class SpjController
             $validated['created_by'] = $id_user;
 
             $spj = Spj::create($validated);
-
+            log_bantuan(['id_fk' => $spj->idspj]);
 
             return response()->json([
                 'code'    => 'success',
@@ -338,6 +393,7 @@ class SpjController
              $validated['updated_by'] = $id_user;
 
             $spj->update($validated);
+            log_bantuan(['id_fk' => $spj->idspj]);
             return response()->json([
                 'message' => 'SPJ berhasil diperbarui',
                 'data'    => $spj->fresh(),
@@ -369,6 +425,7 @@ class SpjController
             }
 
             $spj->delete();
+            log_bantuan(['id_fk' => $spj->idspj]);
             return response()->json([
                 'code'    => 'success',
                 'message' => 'SPJ berhasil dihapus',

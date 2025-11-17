@@ -50,8 +50,7 @@ Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
 Route::apiResource('spj', SpjController::class);
 Route::get('/feed-bantuan', [SpjController::class, 'feedBantuan']);
 Route::get('/detail-bantuan', [SpjController::class, 'detailBantuan']);
-
-Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
+Route::get('/log-bantuan', [UsulanController::class, 'getLogs']);
 Route::get('/statistik', [StatistikController::class, 'getStatistik']);
 Route::get('/sebaran-data', [UsulanController::class, 'getSebaranAnggaranDisetujui']);
 
@@ -60,6 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::put('/user/change-password', [AuthController::class, 'changePassword']);
+
+    Route::apiResource('usulan', UsulanController::class);
+    Route::apiResource('spj', SpjController::class);
 
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('users', UserController::class);
