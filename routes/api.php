@@ -18,48 +18,43 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 
-// API Kecamatan
-Route::apiResource('kecamatan', KecamatanController::class);
-Route::get('kecamatan-search', [KecamatanController::class, 'search']);
+
+Route::prefix('kecamatan')->group(function () {
+    Route::get('/', [KecamatanController::class, 'index']);
+    Route::get('/search', [KecamatanController::class, 'search']);
+    Route::get('/{id}', [KecamatanController::class, 'show']);
+});
 
 
-// API Desa
-Route::apiResource('desa', DesaController::class);
-// Additional routes untuk Desa
-Route::get('/desa-kecamatan/{idKecamatan}', [DesaController::class, 'getByKecamatan']);
-Route::get('/desa-search', [DesaController::class, 'search']);
-Route::get('/desa-paginated', [DesaController::class, 'paginated']);
+Route::prefix('desa')->group(function () {
+    Route::get('/', [DesaController::class, 'index']);
+    Route::get('/search', [DesaController::class, 'search']);
+    Route::get('/paginated', [DesaController::class, 'paginated']);
+    Route::get('/kecamatan/{idKecamatan}', [DesaController::class, 'getByKecamatan']);
+    Route::get('/coordinates', [DesaController::class, 'getByCoordinates']);
+    Route::get('/with-coordinates', [DesaController::class, 'denganKoordinat']);
+    Route::get('/{id}', [DesaController::class, 'show']);
+});
 
 
-// Routes untuk OPD
+
 Route::apiResource('opd', OpdController::class);
-// Additional routes untuk OPD
 Route::get('/opd-search', [OpdController::class, 'search']);
 Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
 Route::get('/opd-paginated', [OpdController::class, 'paginated']);
 
-// Routes untuk User
-Route::apiResource('users', UserController::class);
-// Additional routes untuk User
-Route::get('/users-search', [UserController::class, 'search']);
-Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
-Route::get('/users-paginated', [UserController::class, 'paginated']);
-Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
 
-// Routes untuk Usulan
+
+
 Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
-// API Usulan
-
-
+Route::apiResource('spj', SpjController::class);
 Route::get('/feed-bantuan', [SpjController::class, 'feedBantuan']);
 Route::get('/detail-bantuan', [SpjController::class, 'detailBantuan']);
 Route::get('/log-bantuan', [UsulanController::class, 'getLogs']);
 Route::get('/statistik', [StatistikController::class, 'getStatistik']);
 Route::get('/sebaran-data', [UsulanController::class, 'getSebaranAnggaranDisetujui']);
 
-// Protected routes (perlu authentication)
 Route::middleware('auth:sanctum')->group(function () {
-    // Auth routes
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
@@ -68,13 +63,35 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('usulan', UsulanController::class);
     Route::apiResource('spj', SpjController::class);
 
-    Route::prefix('usulan')->group(function () {
+    Route::middleware('role:admin')->group(function () {
+        Route::apiResource('users', UserController::class);
+        Route::get('/users-search', [UserController::class, 'search']);
+        Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
+        Route::get('/users-paginated', [UserController::class, 'paginated']);
+        Route::put('/users/{id}/status', [UserController::class, 'updateStatus']);
+    });
 
-        // Special actions
+    Route::prefix('desa')->group(function () {
+        Route::post('/', [DesaController::class, 'store']);
+        Route::put('/{id}', [DesaController::class, 'update']);
+        Route::delete('/{id}', [DesaController::class, 'destroy']);
+        Route::patch('/{id}/coordinates', [DesaController::class, 'updateKoordinat']);
+    });
+
+    Route::prefix('kecamatan')->group(function () {
+        Route::post('/', [KecamatanController::class, 'store']);
+        Route::put('/{id}', [KecamatanController::class, 'update']);
+        Route::delete('/{id}', [KecamatanController::class, 'destroy']);
+    });
+
+    Route::prefix('usulan')->group(function () {
+        Route::get('/', [UsulanController::class, 'index']);
+        Route::post('/', [UsulanController::class, 'store']);
+        Route::get('/{id}', [UsulanController::class, 'show']);
+        Route::put('/{id}', [UsulanController::class, 'update']);
+        Route::delete('/{id}', [UsulanController::class, 'destroy']);
         Route::post('/{id}/assign', [UsulanController::class, 'assignOpd']);
         Route::post('/{id}/approve', [UsulanController::class, 'approve']);
-
-        // Logs
         Route::get('/logs/all', [UsulanController::class, 'getLogs']);
     });
 });
