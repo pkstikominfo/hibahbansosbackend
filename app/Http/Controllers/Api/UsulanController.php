@@ -12,6 +12,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+
 
 class UsulanController extends Controller
 {
@@ -501,7 +503,7 @@ class UsulanController extends Controller
 
     public function getSebaranAnggaranDisetujui(Request $request)
     {
-        $level = $request->input('level', 'kecamatan'); // default
+        $level      = $request->input('level', 'kecamatan'); // default
         $betweenCol = $request->input('between_column', 'created_at');
         [$start, $end] = $this->resolveBetweenRange(
             $request->input('between_start'),
@@ -517,14 +519,19 @@ class UsulanController extends Controller
         $whereCol = $request->input('where_column');
         $whereVal = $request->input('where_value');
 
-        // Switch per level
         switch ($level) {
+            /* ============================
+            * LEVEL: DESA
+            * ============================*/
             case 'desa':
                 $rows = DB::table('usulan as u')
                     ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
+                    ->where('u.status', 'disetujui')
                     ->select(
                         'd.iddesa',
                         'd.namadesa',
+                        'd.latitude',
+                        'd.longitude',
                         DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
                     )
                     ->when($idDesa, fn($q) => $q->where('d.iddesa', $idDesa))
@@ -537,7 +544,7 @@ class UsulanController extends Controller
                             $q->where($whereCol, $whereVal);
                         }
                     })
-                    ->groupBy('d.iddesa', 'd.namadesa')
+                    ->groupBy('d.iddesa', 'd.namadesa', 'd.latitude', 'd.longitude')
                     ->orderBy('d.namadesa')
                     ->get();
 
@@ -548,14 +555,22 @@ class UsulanController extends Controller
                         return [
                             'iddesa'                   => (int) $r->iddesa,
                             'namadesa'                 => $r->namadesa,
+                            'latitude'                 => $r->latitude ? (float) $r->latitude : null,
+                            'longitude'                => $r->longitude ? (float) $r->longitude : null,
                             'total_anggaran_disetujui' => (int) $r->total_anggaran_disetujui,
                         ];
                     }),
                 ]);
 
+            /* ============================
+            * LEVEL: SUB JENIS BANTUAN
+            * Tambahkan anak: desa (dengan lat/long)
+            * ============================*/
             case 'subjenisbantuan':
-                $rows = DB::table('usulan as u')
+                // total per sub jenis
+                $subRows = DB::table('usulan as u')
                     ->join('sub_jenis_bantuan as s', 's.idsubjenisbantuan', '=', 'u.idsubjenisbantuan')
+                     ->where('u.status', 'disetujui')
                     ->select(
                         's.idsubjenisbantuan',
                         's.namasubjenis',
@@ -574,24 +589,75 @@ class UsulanController extends Controller
                     ->orderBy('s.namasubjenis')
                     ->get();
 
+                // anak: total per desa untuk tiap sub jenis (punya lat/long desa)
+                $desaRows = DB::table('usulan as u')
+                    ->join('sub_jenis_bantuan as s', 's.idsubjenisbantuan', '=', 'u.idsubjenisbantuan')
+                    ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
+                    ->select(
+                        's.idsubjenisbantuan',
+                        'd.iddesa',
+                        'd.namadesa',
+                        'd.latitude',
+                        'd.longitude',
+                        DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
+                    )
+                    ->when($idSub, fn($q) => $q->where('s.idsubjenisbantuan', $idSub))
+                    ->when($start && $end, fn($q) => $q->whereBetween("u.$betweenCol", [$start, $end]))
+                    ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
+                        if (is_array($whereVal)) {
+                            $q->whereIn($whereCol, $whereVal);
+                        } else {
+                            $q->where($whereCol, $whereVal);
+                        }
+                    })
+                    ->groupBy(
+                        's.idsubjenisbantuan',
+                        'd.iddesa',
+                        'd.namadesa',
+                        'd.latitude',
+                        'd.longitude'
+                    )
+                    ->orderBy('d.namadesa')
+                    ->get()
+                    ->groupBy('idsubjenisbantuan');
+
+                $dataSub = $subRows->map(function ($sub) use ($desaRows) {
+                    $anakDesa = collect($desaRows->get($sub->idsubjenisbantuan, []))->map(function ($d) {
+                        return [
+                            'iddesa'                   => (int) $d->iddesa,
+                            'namadesa'                 => $d->namadesa,
+                            'latitude'                 => $d->latitude ? (float) $d->latitude : null,
+                            'longitude'                => $d->longitude ? (float) $d->longitude : null,
+                            'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
+                        ];
+                    })->values();
+
+                    return [
+                        'idsubjenisbantuan'        => (int) $sub->idsubjenisbantuan,
+                        'namasubjenis'             => $sub->namasubjenis,
+                        'total_anggaran_disetujui' => (int) $sub->total_anggaran_disetujui,
+                        'desa'                     => $anakDesa,
+                    ];
+                })->values();
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Sebaran anggaran disetujui berdasarkan kategori: subjenisbantuan',
-                    'data'    => $rows->map(function ($r) {
-                        return [
-                            'idsubjenisbantuan'        => (int) $r->idsubjenisbantuan,
-                            'namasubjenis'             => $r->namasubjenis,
-                            'total_anggaran_disetujui' => (int) $r->total_anggaran_disetujui,
-                        ];
-                    }),
+                    'data'    => $dataSub,
                 ]);
 
+            /* ============================
+            * LEVEL: KECAMATAN (DEFAULT)
+            * Top level: kecamatan
+            * Anak: desa dengan lat/long
+            * ============================*/
             case 'kecamatan':
             default:
-                // Ambil total per kecamatan
+                // total per kecamatan
                 $kecamatanRows = DB::table('usulan as u')
                     ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
                     ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
+                    ->where('u.status', 'disetujui')
                     ->select(
                         'k.idkecamatan',
                         'k.namakecamatan',
@@ -610,14 +676,17 @@ class UsulanController extends Controller
                     ->orderBy('k.namakecamatan')
                     ->get();
 
-                // Ambil anak: total per desa (untuk kecamatan terfilter)
+                // anak: desa per kecamatan (punya lat/long)
                 $desaRows = DB::table('usulan as u')
                     ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
                     ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
+                    ->where('u.status', 'disetujui')
                     ->select(
                         'k.idkecamatan',
                         'd.iddesa',
                         'd.namadesa',
+                        'd.latitude',
+                        'd.longitude',
                         DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
                     )
                     ->when($idKec, fn($q) => $q->where('k.idkecamatan', $idKec))
@@ -629,7 +698,13 @@ class UsulanController extends Controller
                             $q->where($whereCol, $whereVal);
                         }
                     })
-                    ->groupBy('k.idkecamatan', 'd.iddesa', 'd.namadesa')
+                    ->groupBy(
+                        'k.idkecamatan',
+                        'd.iddesa',
+                        'd.namadesa',
+                        'd.latitude',
+                        'd.longitude'
+                    )
                     ->orderBy('d.namadesa')
                     ->get()
                     ->groupBy('idkecamatan');
@@ -639,6 +714,8 @@ class UsulanController extends Controller
                         return [
                             'iddesa'                   => (int) $d->iddesa,
                             'namadesa'                 => $d->namadesa,
+                            'latitude'                 => $d->latitude ? (float) $d->latitude : null,
+                            'longitude'                => $d->longitude ? (float) $d->longitude : null,
                             'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
                         ];
                     })->values();
