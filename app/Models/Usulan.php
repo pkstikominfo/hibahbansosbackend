@@ -32,7 +32,8 @@ class Usulan extends Model
         'nama',
         'no_sk',
         'nama_lembaga',
-        'catatan_ditolak'
+        'catatan_ditolak',
+        'tahun',
     ];
 
     protected array $statSumColumns = [

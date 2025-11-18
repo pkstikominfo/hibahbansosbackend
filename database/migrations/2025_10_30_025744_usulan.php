@@ -28,6 +28,7 @@ return new class extends Migration
             $table->string('no_sk', 75)->comment('Nilai Berupa NO SK atau NO KTP');
             $table->string('nama_lembaga', 75);
             $table->text('catatan_ditolak')->nullable();
+            $table->year('tahun')->default(date('Y')));
 
             $table->unsignedBigInteger('iddesa')->references('iddesa')->on('desa');
             $table->foreign('idsubjenisbantuan')->references('idsubjenisbantuan')->on('sub_jenis_bantuan');

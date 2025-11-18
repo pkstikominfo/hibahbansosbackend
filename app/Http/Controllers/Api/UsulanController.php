@@ -55,6 +55,7 @@ class UsulanController extends Controller
                         ->orWhere('anggaran_disetujui', 'like', "%{$search}%")
                         ->orWhere('nama', 'like', "%{$search}%")
                         ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhere('tahun', 'like', "%{$search}%")
                         ->orWhereHas('subJenisBantuan', fn($qq) => $qq->where('namasubjenis', 'like', "%{$search}%"))
                         ->orWhereHas('kategori', fn($qq) => $qq->where('namakategori', 'like', "%{$search}%"))
                         ->orWhereHas('opd', fn($qq) => $qq->where('nama_opd', 'like', "%{$search}%"))
@@ -74,7 +75,8 @@ class UsulanController extends Controller
                 'email',
                 'nohp',
                 'status',
-                'nama'
+                'nama',
+                'tahun',
             ];
 
             $relationSorts = [
@@ -149,7 +151,6 @@ class UsulanController extends Controller
     {
         try {
             // ✅ Authorization check - hanya pengusul yang bisa buat usulan
-            $this->authorize('create', Usulan::class);
 
             $validated = $request->validate([
                 'judul'              => ['required', 'string', 'max:255'],
@@ -166,6 +167,7 @@ class UsulanController extends Controller
                 'kode_opd'           => ['required', 'string', 'exists:opd,kode_opd'],
                 'no_sk'           =>    ['required', 'string', 'max:150'],
                 'nama_lembaga'           =>    ['required', 'string', 'max:255'],
+                'tahun'              => ['required', 'digits:4', 'integer', 'min:1900'],
             ]);
 
             // ===== Simpan file
@@ -262,6 +264,7 @@ class UsulanController extends Controller
                 'kode_opd'           => ['sometimes', 'string', 'exists:opd,kode_opd'],
                 'nama_lembaga'      => ['sometimes', 'string', 'max:255'],
                 'catatan_ditolak'   => ['sometimes', 'string', 'max:500'],
+                'tahun'              => ['sometimes', 'digits:4', 'integer', 'min:1900'],
 
                 // ✅ Validasi: no_sk hanya boleh 1x per tahun (kecuali record ini sendiri)
                 'no_sk' => [
