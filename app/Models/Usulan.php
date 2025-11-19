@@ -110,31 +110,31 @@ class Usulan extends Model
     return str_contains($col, '.') ? $col : "{$tbl}.{$col}";
 }
 
-public function getStatistikQB($where = [], $betweenColumn = null, $betweenStart = null, $betweenEnd = null)
+public function getStatistikQB($where = [], ?int $tahun = null)
 {
-    $tanggal_obj = new \DateTime("now");
-    $awal_tahun = $tanggal_obj->format("Y") . "-01-01 00:00:00";
-    $tanggal_berjalan = $tanggal_obj->format("Y-m-d H:i:s");
+    // default: tahun berjalan
+    $tahun = $tahun ?? (int) date('Y');
 
-    // between + prefix kolom agar tidak ambiguous setelah join
-    $kolomBetween = $this->prefixCol($betweenColumn ?? 'created_at');
-    $awalBetween  = $betweenStart ?? $awal_tahun;
-    $akhirBetween = $betweenEnd   ?? $tanggal_berjalan;
-
-    $qb = $this->newQuery()->whereBetween($kolomBetween, [$awalBetween, $akhirBetween]);
+    // base query: filter tahun dari kolom usulan.tahun
+    $qb = $this->newQuery()
+        ->where($this->prefixCol('tahun'), $tahun);
 
     // where dinamis + prefix kolom
     if (!empty($where)) {
         foreach ($where as $key => $value) {
-            $key = $this->prefixCol($key);
+            $key = $this->prefixCol($key); // misal "status" -> "usulan.status"
 
             if (is_array($value)) {
                 $operator = strtolower($value[0]);
-                $val = $value[1];
+                $val      = $value[1];
 
-                if ($operator === 'in')        $qb->whereIn($key, $val);
-                elseif ($operator === 'not in') $qb->whereNotIn($key, $val);
-                else                            $qb->where($key, $value[0], $value[1]);
+                if ($operator === 'in') {
+                    $qb->whereIn($key, $val);
+                } elseif ($operator === 'not in') {
+                    $qb->whereNotIn($key, $val);
+                } else {
+                    $qb->where($key, $value[0], $value[1]);
+                }
             } else {
                 $qb->where($key, $value);
             }
@@ -148,11 +148,11 @@ public function getStatistikQB($where = [], $betweenColumn = null, $betweenStart
 
     return $qb;
 }
-
-public function getStatistikJumlahPenerima($where = [], $groupBy = null, $betweenColumn = null, $betweenStart = null, $betweenEnd = null)
+public function getStatistikJumlahPenerima($where = [], $groupBy = null, ?int $tahun = null)
 {
-    $qb = $this->getStatistikQB($where, $betweenColumn, $betweenStart, $betweenEnd);
+    $qb = $this->getStatistikQB($where, $tahun);
 
+    // tanpa group: hitung total penerima
     if (!$groupBy) {
         return (int) $qb->count();
     }
@@ -173,9 +173,9 @@ public function getStatistikJumlahPenerima($where = [], $groupBy = null, $betwee
     return $qb->get();
 }
 
-public function getStatistikJumlahAnggaran($where = [], $groupBy = null, $betweenColumn = null, $betweenStart = null, $betweenEnd = null)
+public function getStatistikJumlahAnggaran($where = [], $groupBy = null, ?int $tahun = null)
 {
-    $qb = $this->getStatistikQB($where, $betweenColumn, $betweenStart, $betweenEnd);
+    $qb = $this->getStatistikQB($where, $tahun);
 
     if (!$groupBy) {
         // satu baris total

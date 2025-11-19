@@ -66,42 +66,42 @@ class Spj extends Model
     return str_contains($col, '.') ? $col : "{$tbl}.{$col}";
 }
 
-public function getStatistikQB($where = [], $betweenColumn = 'tgl_verifikasi', $betweenStart = null, $betweenEnd = null)
+public function getStatistikQB($where = [], ?int $tahun = null)
 {
-    $tanggal_obj = new \DateTime("now");
-    $awal_tahun = $tanggal_obj->format("Y") . "-01-01 00:00:00";
-    $tanggal_berjalan = $tanggal_obj->format("Y-m-d H:i:s");
+    $tahun = $tahun ?? (int) date('Y');
 
-    $kolomBetween = $this->prefixCol($betweenColumn ?? 'tgl_verifikasi');
-    $awalBetween  = $betweenStart ?? $awal_tahun;
-    $akhirBetween = $betweenEnd   ?? $tanggal_berjalan;
+    $qb = $this->newQuery()
+        ->join('usulan', 'usulan.idusulan', '=', 'spj.idusulan')
+        ->where('usulan.tahun', $tahun);
 
-    $qb = $this->newQuery()->whereBetween($kolomBetween, [$awalBetween, $akhirBetween]);
-
+    // where dinamis
     if (!empty($where)) {
         foreach ($where as $key => $value) {
-            $key = $this->prefixCol($key);
+            $key = $this->prefixCol($key); // mis: "status" -> "spj.status"
+
             if (is_array($value)) {
-                $op  = strtolower($value[0]); $val = $value[1];
-                if ($op === 'in')        $qb->whereIn($key, $val);
-                elseif ($op === 'not in') $qb->whereNotIn($key, $val);
-                else                      $qb->where($key, $value[0], $value[1]);
+                $operator = strtolower($value[0]);
+                $val      = $value[1];
+
+                if ($operator === 'in') {
+                    $qb->whereIn($key, $val);
+                } elseif ($operator === 'not in') {
+                    $qb->whereNotIn($key, $val);
+                } else {
+                    $qb->where($key, $value[0], $value[1]);
+                }
             } else {
                 $qb->where($key, $value);
             }
         }
     }
 
-    if (in_array('Illuminate\\Database\\Eloquent\\SoftDeletes', class_uses_recursive($this))) {
-        $qb->whereNull($this->getTable() . '.deleted_at');
-    }
-
     return $qb;
 }
 
-public function getStatistikJumlahPenerima($where = [], $groupBy = null, $betweenColumn = 'tgl_verifikasi', $betweenStart = null, $betweenEnd = null)
+public function getStatistikJumlahPenerima($where = [], $groupBy = null, ?int $tahun = null)
 {
-    $qb = $this->getStatistikQB($where, $betweenColumn, $betweenStart, $betweenEnd);
+    $qb = $this->getStatistikQB($where, $tahun);
 
     if (!$groupBy) {
         return (int) $qb->count();
@@ -110,34 +110,24 @@ public function getStatistikJumlahPenerima($where = [], $groupBy = null, $betwee
     $groups = (array) $groupBy;
     $pref   = array_map(fn($g) => $this->prefixCol($g), $groups);
 
-    if (in_array('spj.iddesa', $pref, true)) {
-        $qb->leftJoin('desa', 'spj.iddesa', '=', 'desa.iddesa');
-        $qb->addSelect('desa.namadesa');
-        $pref[] = 'desa.namadesa';
-    }
-
     $qb->select(array_merge($pref, [DB::raw('COUNT(*) AS total_spj')]))
        ->groupBy($pref);
 
     return $qb->get();
 }
 
-public function getStatistikJumlahAnggaran($where = [], $groupBy = null, $betweenColumn = 'tgl_verifikasi', $betweenStart = null, $betweenEnd = null)
+public function getStatistikJumlahAnggaran($where = [], $groupBy = null, ?int $tahun = null)
 {
-    $qb = $this->getStatistikQB($where, $betweenColumn, $betweenStart, $betweenEnd);
+    $qb = $this->getStatistikQB($where, $tahun);
 
     if (!$groupBy) {
-        return $qb->selectRaw('COALESCE(SUM(realisasi), 0) AS total_realisasi')->first();
+        return $qb->selectRaw('
+            COALESCE(SUM(realisasi), 0) AS total_realisasi
+        ')->first();
     }
 
     $groups = (array) $groupBy;
     $pref   = array_map(fn($g) => $this->prefixCol($g), $groups);
-
-    if (in_array('spj.iddesa', $pref, true)) {
-        $qb->leftJoin('desa', 'spj.iddesa', '=', 'desa.iddesa');
-        $qb->addSelect('desa.namadesa');
-        $pref[] = 'desa.namadesa';
-    }
 
     $qb->select(array_merge($pref, [
         DB::raw('COALESCE(SUM(realisasi), 0) AS total_realisasi'),

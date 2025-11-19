@@ -90,7 +90,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}', [UsulanController::class, 'show']);
         Route::put('/{id}', [UsulanController::class, 'update']);
         Route::delete('/{id}', [UsulanController::class, 'destroy']);
-        Route::post('/{id}/assign', [UsulanController::class, 'assignOpd']);
         Route::post('/{id}/approve', [UsulanController::class, 'approve']);
         Route::get('/logs/all', [UsulanController::class, 'getLogs']);
     });
