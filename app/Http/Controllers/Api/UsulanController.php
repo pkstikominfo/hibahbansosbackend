@@ -451,7 +451,7 @@ class UsulanController extends Controller
         }
     }
 
-        public function getSebaranAnggaranDisetujui(Request $request)
+    public function getSebaranAnggaranDisetujui(Request $request)
     {
         $level = $request->input('level', 'kecamatan');
 

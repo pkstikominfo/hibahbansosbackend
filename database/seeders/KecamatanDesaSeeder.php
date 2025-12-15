@@ -15,96 +15,146 @@ class KecamatanDesaSeeder extends Seeder
      */
     public function run(): void
     {
-        // Data kecamatan dan desa (realistic data)
+
+        Desa::truncate();
+        Kecamatan::truncate();
+
         $data = [
             [
-                'kecamatan' => 'Pinogaluman',
+                'kecamatan' => 'Bintauna',
                 'desa' => [
-                    'Biontong',
-                    'Biontong I',
-                    'Bundu',
-                    'Dondomon',
-                    'Dondomon Utara',
-                    'Inobonto',
-                    'Inobonto II',
-                    'Lobong',
-                    'Lobong I',
-                    'Matayangan'
+                    'Batulintik',
+                    'Bintauna Pantai',
+                    'Bunia',
+                    'Bunong',
+                    'Huntuk',
+                    'Kopi',
+                    'Kuhanga',
+                    'Minanga',
+                    'Mome',
+                    'Padang',
+                    'Padang Barat',
+                    'Pimpi',
+                    'Talaga',
+                    'Voa A',
+                    'Vahuta',
+                    'Bintauna' // Kelurahan
                 ]
             ],
             [
                 'kecamatan' => 'Bolangitang Barat',
                 'desa' => [
-                    'Binuang',
-                    'Biontong',
-                    'Biontong I',
-                    'Bondar',
-                    'Bondar Sobi',
-                    'Bulo',
-                    'Bungabung',
-                    'Dengi',
-                    'Dengi II',
-                    'Doodolan'
+                    'Bolangitang',
+                    'Bolangitang I',
+                    'Bolangitang II',
+                    'Jambusarang',
+                    'Talaga Tomoagu',
+                    'Iyok',
+                    'Keimanga',
+                    'Langi',
+                    'Ollot',
+                    'Ollot I',
+                    'Ollot II',
+                    'Paku',
+                    'Paku Selatan',
+                    'Sonuo',
+                    'Talaga',
+                    'Tanjung Buaya',
+                    'Tote',
+                    'Wakat'
                 ]
             ],
             [
                 'kecamatan' => 'Bolangitang Timur',
                 'desa' => [
-                    'Abak',
-                    'Babo',
-                    'Bungkudolon',
-                    'Bungkudolon Timur',
-                    'Dumagin',
-                    'Dumagin B',
-                    'Kanaan',
-                    'Motongkad',
-                    'Motongkad Selatan',
-                    'Motongkad Utara'
+                    'Binjeita',
+                    'Binjeita I',
+                    'Binjeita II',
+                    'Binuanga',
+                    'Binuni',
+                    'Biontong',
+                    'Biontong I',
+                    'Biontong II',
+                    'Bohabak I',
+                    'Bohabak II',
+                    'Bohabak III',
+                    'Bohabak IV',
+                    'Lipu Bogu',
+                    'Mokoditek',
+                    'Mokoditek I',
+                    'Nagara',
+                    'Nunuka',
+                    'Saleo',
+                    'Saleo Satu',
+                    'Tanjung Labou'
                 ]
             ],
             [
                 'kecamatan' => 'Kaidipang',
                 'desa' => [
-                    'Bigongang',
-                    'Bira',
-                    'Bira I',
-                    'Bulo',
-                    'Dalam',
-                    'Dengi',
-                    'Dondomon',
-                    'Dondomon I',
-                    'Duini',
-                    'Duwong'
+                    'Bigo',
+                    'Bigo Selatan',
+                    'Boroko',
+                    'Boroko Timur',
+                    'Boroko Utara',
+                    'Gihang',
+                    'Inomunga',
+                    'Inomunga Utara',
+                    'Komus II',
+                    'Komus Dua Timur',
+                    'Kuala',
+                    'Kuala Utara',
+                    'Pontak',
+                    'Soligir',
+                    'Solo'
                 ]
             ],
             [
-                'kecamatan' => 'Bintauna',
+                'kecamatan' => 'Pinogaluman',
                 'desa' => [
-                    'Bangka',
-                    'Bangka I',
-                    'Bangka II',
-                    'Bangka III',
-                    'Bangka IV',
-                    'Bangka V',
-                    'Bongkudai',
-                    'Bongkudai Barat',
-                    'Bongkudai Selatan',
-                    'Bongkudai Utara'
+                    'Batu Batayo',
+                    'Batutajam',
+                    'Buko',
+                    'Buko Selatan',
+                    'Buko Utara',
+                    'Busato',
+                    'Dalapuli',
+                    'Dalapuli Barat',
+                    'Dalapuli Timur',
+                    'Dengi',
+                    'Duini',
+                    'Kayuogu',
+                    'Komus Satu',
+                    'Padango',
+                    'Tanjung Sidupa',
+                    'Tambulang Pantai',
+                    'Tambulang Timur',
+                    'Tombulang',
+                    'Tontulow',
+                    'Tuntung',
+                    'Tuntung Timur',
+                    'Tuntulow Utara'
                 ]
             ],
             [
                 'kecamatan' => 'Sangkub',
                 'desa' => [
-                    'Bongkudai',
-                    'Bongkudai Barat',
-                    'Bongkudai Selatan',
-                    'Bongkudai Utara',
-                    'Bongkudai Timur',
-                    'Momalia',
-                    'Momalia I',
-                    'Momalia II',
-                    'Mongkoinit',
-                    'Mongkoinit Selatan'
+                    'Ampeng Sembeka',
+                    'Busisingo',
+                    'Busisingo Utara',
+                    'Mokusato',
+                    'Monompia',
+                    'Pangkusa',
+                    'Sampiro',
+                    'Sangkub I',
+                    'Sangkub II',
+                    'Sangkub III',
+                    'Sangkub IV',
+                    'Sangkub Timur',
+                    'Sangtombolang',
+                    'Sidodadi',
+                    'Suka Makmur',
+                    'Tombolango'
                 ]
             ]
         ];
