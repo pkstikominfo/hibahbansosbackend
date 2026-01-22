@@ -451,193 +451,69 @@ class UsulanController extends Controller
         }
     }
 
-    public function getSebaranAnggaranDisetujui(Request $request)
-    {
-        $level = $request->input('level', 'kecamatan');
+   public function getSebaranAnggaranDisetujui(Request $request)
+{
+    /* =====================================================
+     * PARAMETER
+     * =====================================================*/
+    $tahun = (int) $request->input('tahun', now()->year);
+    $level = $request->input('level', 'kecamatan');
 
-        // 🔹 Tahun default = tahun sekarang, bisa diubah via ?tahun=2024
-        $tahun = (int) $request->input('tahun', now()->year);
+    $filterKec  = $request->input('filter_kecamatan');
+    $filterDesa = $request->input('filter_desa');
+    $filterSub  = $request->input('filter_subjenisbantuan');
 
-        // Filter khusus sesuai level
-        $idKec  = $request->input('idkecamatan');
-        $idDesa = $request->input('iddesa');
-        $idSub  = $request->input('idsubjenisbantuan');
+    if (!in_array($level, ['kecamatan', 'desa', 'subjenisbantuan'])) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Level tidak valid'
+        ], 422);
+    }
 
-        // Filter bebas (opsional)
-        $whereCol = $request->input('where_column');
-        $whereVal = $request->input('where_value');
+    /* =====================================================
+     * LEVEL KECAMATAN
+     * =====================================================*/
+    if ($level === 'kecamatan') {
 
-        /* =====================================================
-            *  LEVEL DESA
-            * =====================================================*/
-        if ($level === 'desa') {
-            $rows = DB::table('desa as d')
-                // LEFT JOIN ke usulan supaya desa tanpa usulan tetap muncul
-                ->leftJoin('usulan as u', function ($join) use ($tahun) {
-                    $join->on('u.iddesa', '=', 'd.iddesa')
-                        ->where('u.status', 'disetujui')
-                        ->where('u.tahun', $tahun);
-                })
-                ->when($idDesa, fn($q) => $q->where('d.iddesa', $idDesa))
-                ->when($idKec,  fn($q) => $q->where('d.idkecamatan', $idKec))
-                ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
-                    return is_array($whereVal)
-                        ? $q->whereIn($whereCol, $whereVal)
-                        : $q->where($whereCol, $whereVal);
-                })
-                ->select(
-                    'd.iddesa',
-                    'd.namadesa',
-                    'd.latitude',
-                    'd.longitude',
-                    DB::raw('COALESCE(SUM(u.anggaran_disetujui), 0) as total_anggaran_disetujui')
-                )
-                ->groupBy('d.iddesa', 'd.namadesa', 'd.latitude', 'd.longitude')
-                ->orderBy('d.namadesa')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Sebaran anggaran disetujui berdasarkan desa',
-                'data'    => $rows->map(function ($r) {
-                    return [
-                        'iddesa'                   => (int) $r->iddesa,
-                        'namadesa'                 => $r->namadesa,
-                        'latitude'                 => $r->latitude ? (float) $r->latitude : null,
-                        'longitude'                => $r->longitude ? (float) $r->longitude : null,
-                        'total_anggaran_disetujui' => (int) $r->total_anggaran_disetujui,
-                    ];
-                }),
-            ]);
-        }
-
-        /* =====================================================
-            *  LEVEL SUB JENIS BANTUAN
-            * =====================================================*/
-        if ($level === 'subjenisbantuan') {
-
-            // 🔹 TOTAL PER SUB JENIS (semua sub jenis muncul walau 0)
-            $subRows = DB::table('sub_jenis_bantuan as s')
-                ->leftJoin('usulan as u', function ($join) use ($tahun) {
-                    $join->on('u.idsubjenisbantuan', '=', 's.idsubjenisbantuan')
-                        ->where('u.status', 'disetujui')
-                        ->where('u.tahun', $tahun);
-                })
-                ->when($idSub, fn($q) => $q->where('s.idsubjenisbantuan', $idSub))
-                ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
-                    return is_array($whereVal)
-                        ? $q->whereIn($whereCol, $whereVal)
-                        : $q->where($whereCol, $whereVal);
-                })
-                ->select(
-                    's.idsubjenisbantuan',
-                    's.namasubjenis',
-                    DB::raw('COALESCE(SUM(u.anggaran_disetujui), 0) as total_anggaran_disetujui')
-                )
-                ->groupBy('s.idsubjenisbantuan', 's.namasubjenis')
-                ->orderBy('s.namasubjenis')
-                ->get();
-
-            // 🔹 Anak: per desa untuk tiap sub jenis (hanya desa yang memang punya usulan)
-            $desaRows = DB::table('usulan as u')
-                ->join('sub_jenis_bantuan as s', 's.idsubjenisbantuan', '=', 'u.idsubjenisbantuan')
-                ->join('desa as d', 'd.iddesa', '=', 'u.iddesa')
-                ->where('u.status', 'disetujui')
-                ->where('u.tahun', $tahun)
-                ->when($idSub, fn($q) => $q->where('s.idsubjenisbantuan', $idSub))
-                ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
-                    return is_array($whereVal)
-                        ? $q->whereIn($whereCol, $whereVal)
-                        : $q->where($whereCol, $whereVal);
-                })
-                ->select(
-                    's.idsubjenisbantuan',
-                    'd.iddesa',
-                    'd.namadesa',
-                    'd.latitude',
-                    'd.longitude',
-                    DB::raw('SUM(u.anggaran_disetujui) as total_anggaran_disetujui')
-                )
-                ->groupBy('s.idsubjenisbantuan', 'd.iddesa', 'd.namadesa', 'd.latitude', 'd.longitude')
-                ->orderBy('d.namadesa')
-                ->get()
-                ->groupBy('idsubjenisbantuan');
-
-            $result = $subRows->map(function ($sub) use ($desaRows) {
-                $desaList = collect($desaRows->get($sub->idsubjenisbantuan, []));
-                return [
-                    'idsubjenisbantuan'        => (int) $sub->idsubjenisbantuan,
-                    'namasubjenis'             => $sub->namasubjenis,
-                    'total_anggaran_disetujui' => (int) $sub->total_anggaran_disetujui,
-                    'desa'                     => $desaList->map(function ($d) {
-                        return [
-                            'iddesa'                   => (int) $d->iddesa,
-                            'namadesa'                 => $d->namadesa,
-                            'latitude'                 => $d->latitude ? (float) $d->latitude : null,
-                            'longitude'                => $d->longitude ? (float) $d->longitude : null,
-                            'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
-                        ];
-                    })->values(),
-                ];
-            })->values();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Sebaran anggaran disetujui berdasarkan sub jenis bantuan',
-                'data'    => $result,
-            ]);
-        }
-
-        /* =====================================================
-            *  LEVEL KECAMATAN (DEFAULT)
-            * =====================================================*/
-
-        // 🔹 TOTAL PER KECAMATAN (semua kecamatan muncul walau belum ada usulan)
+        // master kecamatan
         $kecamatanRows = DB::table('kecamatan as k')
-            ->leftJoin('desa as d', 'd.idkecamatan', '=', 'k.idkecamatan')
-            ->leftJoin('usulan as u', function ($join) use ($tahun) {
-                $join->on('u.iddesa', '=', 'd.iddesa')
-                    ->where('u.status', 'disetujui')
-                    ->where('u.tahun', $tahun);
-            })
-            ->when($idKec, fn($q) => $q->where('k.idkecamatan', $idKec))
-            ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
-                return is_array($whereVal)
-                    ? $q->whereIn($whereCol, $whereVal)
-                    : $q->where($whereCol, $whereVal);
-            })
-            ->select(
-                'k.idkecamatan',
-                'k.namakecamatan',
-                DB::raw('COALESCE(SUM(u.anggaran_disetujui), 0) as total_anggaran_disetujui')
-            )
-            ->groupBy('k.idkecamatan', 'k.namakecamatan')
+            ->when($filterKec, fn ($q) => $q->where('k.idkecamatan', $filterKec))
+            ->select('k.idkecamatan', 'k.namakecamatan')
             ->orderBy('k.namakecamatan')
             ->get();
 
-        // 🔹 Anak: desa per kecamatan (semua desa muncul walau belum ada usulan)
+        // desa + total
         $desaRows = DB::table('desa as d')
             ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
-            ->leftJoin('usulan as u', function ($join) use ($tahun) {
+            ->leftJoin('usulan as u', function ($join) use ($tahun, $filterSub, $filterDesa) {
                 $join->on('u.iddesa', '=', 'd.iddesa')
                     ->where('u.status', 'disetujui')
                     ->where('u.tahun', $tahun);
+
+                if ($filterSub !== null) {
+                    $join->where('u.idsubjenisbantuan', $filterSub);
+                }
+
+                if ($filterDesa !== null) {
+                    $join->where('u.iddesa', $filterDesa);
+                }
             })
-            ->when($idKec, fn($q) => $q->where('k.idkecamatan', $idKec))
-            ->when($whereCol && $whereVal !== null, function ($q) use ($whereCol, $whereVal) {
-                return is_array($whereVal)
-                    ? $q->whereIn($whereCol, $whereVal)
-                    : $q->where($whereCol, $whereVal);
-            })
+            ->when($filterKec, fn ($q) => $q->where('k.idkecamatan', $filterKec))
             ->select(
                 'k.idkecamatan',
                 'd.iddesa',
                 'd.namadesa',
                 'd.latitude',
                 'd.longitude',
-                DB::raw('COALESCE(SUM(u.anggaran_disetujui), 0) as total_anggaran_disetujui')
+                DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
             )
-            ->groupBy('k.idkecamatan', 'd.iddesa', 'd.namadesa', 'd.latitude', 'd.longitude')
+            ->groupBy(
+                'k.idkecamatan',
+                'd.iddesa',
+                'd.namadesa',
+                'd.latitude',
+                'd.longitude'
+            )
             ->orderBy('d.namadesa')
             ->get()
             ->groupBy('idkecamatan');
@@ -647,25 +523,115 @@ class UsulanController extends Controller
             return [
                 'idkecamatan'              => (int) $kec->idkecamatan,
                 'namakecamatan'            => $kec->namakecamatan,
-                'total_anggaran_disetujui' => (int) $kec->total_anggaran_disetujui,
-                'desa'                     => $desaList->map(function ($d) {
-                    return [
-                        'iddesa'                   => (int) $d->iddesa,
-                        'namadesa'                 => $d->namadesa,
-                        'latitude'                 => $d->latitude ? (float) $d->latitude : null,
-                        'longitude'                => $d->longitude ? (float) $d->longitude : null,
-                        'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
-                    ];
-                })->values(),
+                'total_anggaran_disetujui' => (int) $desaList->sum('total_anggaran_disetujui'),
+                'desa' => $desaList->map(fn ($d) => [
+                    'iddesa'                   => (int) $d->iddesa,
+                    'namadesa'                 => $d->namadesa,
+                    'latitude'                 => $d->latitude ? (float) $d->latitude : null,
+                    'longitude'                => $d->longitude ? (float) $d->longitude : null,
+                    'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
+                ])->values(),
             ];
         })->values();
 
         return response()->json([
             'success' => true,
             'message' => 'Sebaran anggaran disetujui berdasarkan kecamatan',
-            'data'    => $data,
+            'data' => $data,
         ]);
     }
+
+    /* =====================================================
+     * LEVEL DESA
+     * =====================================================*/
+    if ($level === 'desa') {
+
+        $desaRows = DB::table('desa as d')
+            ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
+            ->leftJoin('usulan as u', function ($join) use ($tahun, $filterSub) {
+                $join->on('u.iddesa', '=', 'd.iddesa')
+                    ->where('u.status', 'disetujui')
+                    ->where('u.tahun', $tahun);
+
+                if ($filterSub !== null) {
+                    $join->where('u.idsubjenisbantuan', $filterSub);
+                }
+            })
+            ->when($filterKec, fn ($q) => $q->where('k.idkecamatan', $filterKec))
+            ->when($filterDesa, fn ($q) => $q->where('d.iddesa', $filterDesa))
+            ->select(
+                'd.iddesa',
+                'd.namadesa',
+                'k.idkecamatan',
+                'k.namakecamatan',
+                'd.latitude',
+                'd.longitude',
+                DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
+            )
+            ->groupBy(
+                'd.iddesa',
+                'd.namadesa',
+                'k.idkecamatan',
+                'k.namakecamatan',
+                'd.latitude',
+                'd.longitude'
+            )
+            ->orderBy('d.namadesa')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sebaran anggaran disetujui berdasarkan desa',
+            'data' => $desaRows->map(fn ($d) => [
+                'iddesa'                   => (int) $d->iddesa,
+                'namadesa'                 => $d->namadesa,
+                'idkecamatan'              => (int) $d->idkecamatan,
+                'namakecamatan'            => $d->namakecamatan,
+                'latitude'                 => $d->latitude ? (float) $d->latitude : null,
+                'longitude'                => $d->longitude ? (float) $d->longitude : null,
+                'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
+            ]),
+        ]);
+    }
+
+    /* =====================================================
+     * LEVEL SUB JENIS BANTUAN
+     * =====================================================*/
+    if ($level === 'subjenisbantuan') {
+
+        $subRows = DB::table('sub_jenis_bantuan as s')
+            ->leftJoin('usulan as u', function ($join) use ($tahun, $filterDesa) {
+                $join->on('u.idsubjenisbantuan', '=', 's.idsubjenisbantuan')
+                    ->where('u.status', 'disetujui')
+                    ->where('u.tahun', $tahun);
+
+                if ($filterDesa !== null) {
+                    $join->where('u.iddesa', $filterDesa);
+                }
+            })
+            ->when($filterSub, fn ($q) => $q->where('s.idsubjenisbantuan', $filterSub))
+            ->select(
+                's.idsubjenisbantuan',
+                's.namasubjenis',
+                DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
+            )
+            ->groupBy('s.idsubjenisbantuan', 's.namasubjenis')
+            ->orderBy('s.namasubjenis')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sebaran anggaran disetujui berdasarkan sub jenis bantuan',
+            'data' => $subRows->map(fn ($s) => [
+                'idsubjenisbantuan'        => (int) $s->idsubjenisbantuan,
+                'namasubjenis'             => $s->namasubjenis,
+                'total_anggaran_disetujui' => (int) $s->total_anggaran_disetujui,
+            ]),
+        ]);
+    }
+}
+
+
 
 
     /**
