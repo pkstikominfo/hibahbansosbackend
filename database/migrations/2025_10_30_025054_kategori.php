@@ -15,6 +15,7 @@ return new class extends Migration
             $table->tinyInteger('idkategori', true);
             $table->tinyInteger('idjenisbantuan');
             $table->text('namakategori')->nullable();
+            $table->text('keterangan')->nullable();
 
             $table->foreign('idjenisbantuan')->references('idjenisbantuan')->on('jenis_bantuan');
         });

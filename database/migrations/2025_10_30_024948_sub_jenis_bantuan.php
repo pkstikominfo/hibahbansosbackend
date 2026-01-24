@@ -15,6 +15,7 @@ return new class extends Migration
             $table->tinyInteger('idsubjenisbantuan', true);
             $table->tinyInteger('idjenisbantuan')->nullable();
             $table->string('namasubjenis', 30)->nullable();
+            $table->text('keterangan')->nullable();
 
             $table->foreign('idjenisbantuan')->references('idjenisbantuan')->on('jenis_bantuan');
         });
