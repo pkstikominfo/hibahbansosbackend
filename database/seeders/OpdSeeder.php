@@ -2,21 +2,13 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use App\Models\Opd;
 
 class OpdSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // Hapus data lama jika ada
-        DB::table('opd')->truncate();
-
         $opdData = [
             ['kode_opd' => 'OPD001', 'nama_opd' => 'Dinas Pendidikan'],
             ['kode_opd' => 'OPD002', 'nama_opd' => 'Dinas Kesehatan'],
@@ -32,7 +24,7 @@ class OpdSeeder extends Seeder
             ['kode_opd' => 'OPD012', 'nama_opd' => 'Dinas Perhubungan'],
             ['kode_opd' => 'OPD013', 'nama_opd' => 'Dinas Komunikasi dan Informatika'],
             ['kode_opd' => 'OPD014', 'nama_opd' => 'Dinas Koperasi, Usaha Kecil dan Menengah'],
-            ['kode_opd' => 'OPD015', 'nama_opd' => 'Dinas Penanaman Modal dan Pelayanan Terpadu Satu Pintu'],
+            ['kode_opd' => 'OPD015', 'nama_opd' => 'Dinas Penanaman Modal dan PTSP'],
             ['kode_opd' => 'OPD016', 'nama_opd' => 'Dinas Kepemudaan dan Olahraga'],
             ['kode_opd' => 'OPD017', 'nama_opd' => 'Dinas Perpustakaan dan Kearsipan'],
             ['kode_opd' => 'OPD018', 'nama_opd' => 'Dinas Kelautan dan Perikanan'],
@@ -43,13 +35,13 @@ class OpdSeeder extends Seeder
             ['kode_opd' => 'OPD023', 'nama_opd' => 'Sekretariat Daerah'],
             ['kode_opd' => 'OPD024', 'nama_opd' => 'Sekretariat DPRD'],
             ['kode_opd' => 'OPD025', 'nama_opd' => 'Inspektorat'],
-            ['kode_opd' => 'OPD026', 'nama_opd' => 'Badan Perencanaan Pembangunan Daerah'],
-            ['kode_opd' => 'OPD027', 'nama_opd' => 'Badan Pengelolaan Keuangan dan Aset Daerah'],
-            ['kode_opd' => 'OPD028', 'nama_opd' => 'Badan Kepegawaian Daerah'],
+            ['kode_opd' => 'OPD026', 'nama_opd' => 'Bappeda'],
+            ['kode_opd' => 'OPD027', 'nama_opd' => 'BPKAD'],
+            ['kode_opd' => 'OPD028', 'nama_opd' => 'BKD'],
             ['kode_opd' => 'OPD029', 'nama_opd' => 'Badan Pendapatan Daerah'],
-            ['kode_opd' => 'OPD030', 'nama_opd' => 'Badan Penanggulangan Bencana Daerah'],
-            ['kode_opd' => 'OPD031', 'nama_opd' => 'Badan Kesatuan Bangsa dan Politik'],
-            ['kode_opd' => 'OPD032', 'nama_opd' => 'Satuan Polisi Pamong Praja'],
+            ['kode_opd' => 'OPD030', 'nama_opd' => 'BPBD'],
+            ['kode_opd' => 'OPD031', 'nama_opd' => 'Kesbangpol'],
+            ['kode_opd' => 'OPD032', 'nama_opd' => 'Satpol PP'],
             ['kode_opd' => 'OPD033', 'nama_opd' => 'Dinas Kebudayaan'],
             ['kode_opd' => 'OPD034', 'nama_opd' => 'Kecamatan Malalayang'],
             ['kode_opd' => 'OPD035', 'nama_opd' => 'Kecamatan Sario'],
@@ -64,7 +56,6 @@ class OpdSeeder extends Seeder
             ['kode_opd' => 'OPD044', 'nama_opd' => 'Kecamatan Bunaken Kepulauan'],
         ];
 
-        // Insert data menggunakan foreach untuk menghindari error duplikasi
         foreach ($opdData as $opd) {
             Opd::updateOrCreate(
                 ['kode_opd' => $opd['kode_opd']],
