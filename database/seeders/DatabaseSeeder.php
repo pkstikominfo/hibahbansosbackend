@@ -20,11 +20,12 @@ class DatabaseSeeder extends Seeder
         $this->call([
             HibahBansosSeeder::class,
             KecamatanDesaSeeder::class,
+            OpdSeeder::class,
             AdditionalUserSeeder::class,
             JenisBantuanSeeder::class,
             SubJenisBantuanSeeder::class,
             KategoriSeeder::class,
-            OpdSeeder::class
+
         ]);
 
         $token = [
