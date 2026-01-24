@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Http\Controllers\Api\OpdController;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -22,6 +24,18 @@ class DatabaseSeeder extends Seeder
             JenisBantuanSeeder::class,
             SubJenisBantuanSeeder::class,
             KategoriSeeder::class,
+            OpdSeeder::class
         ]);
+
+        $token = [
+            [
+                'id'   => 1,
+                'source'  => 'Fonte',
+                'token'  => '3qq6bnduK78W8DRgGi13',
+                'nama'  => 'Smartfren',
+                'status' => 'active'
+            ],
+        ];
+        DB::table('tb_token')->insert($token);
     }
 }

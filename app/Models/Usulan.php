@@ -20,7 +20,6 @@ class Usulan extends Model
     protected $fillable = [
         'judul',
         'anggaran_usulan',
-        'file_persyaratan',
         'email',
         'nohp',
         'idsubjenisbantuan',
@@ -30,8 +29,6 @@ class Usulan extends Model
         'status',
         'iddesa',
         'nama',
-        'no_sk',
-        'nama_lembaga',
         'catatan_ditolak',
         'tahun',
     ];

@@ -109,13 +109,6 @@ class UsulanController extends Controller
 
             $usulan = $query->paginate($perPage, ['*'], 'page', $page);
 
-            // 🖼️ absolute URL untuk file
-            $usulan->getCollection()->transform(function ($item) {
-                $item->file_persyaratan = $item->file_persyaratan
-                    ? asset("storage/uploads/{$item->file_persyaratan}")
-                    : null;
-                return $item;
-            });
 
             return response()->json([
                 'code' => 'success',
@@ -156,7 +149,6 @@ class UsulanController extends Controller
                 'judul'              => ['required', 'string', 'max:255'],
                 'anggaran_usulan'    => ['required', 'integer', 'min:0'],
                 'anggaran_disetujui' => ['nullable', 'integer', 'min:0'],
-                'file_persyaratan'   => ['required', 'file', 'max:2048'],
                 'email'              => ['required', 'email', 'max:50'],
                 'nohp'               => ['required', 'string', 'max:15'],
                 'nama'               => ['required', 'string', 'max:100'],
@@ -165,16 +157,9 @@ class UsulanController extends Controller
                 'idkategori'         => ['required', 'integer', 'exists:kategori,idkategori'],
                 'iddesa'             => ['required', 'integer', 'exists:desa,iddesa'],
                 'kode_opd'           => ['required', 'string', 'exists:opd,kode_opd'],
-                'no_sk'           =>    ['required', 'string', 'max:150'],
-                'nama_lembaga'           =>    ['required', 'string', 'max:255'],
                 'tahun'              => ['required', 'digits:4', 'integer', 'min:1900'],
             ]);
 
-            // ===== Simpan file
-            $file = $request->file('file_persyaratan');
-            $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('uploads', $filename, 'public');
-            $validated['file_persyaratan'] = $filename;
 
             // ===== Simpan data
             $usulan = Usulan::create($validated);
@@ -210,9 +195,39 @@ class UsulanController extends Controller
             // ✅ Authorization check
             $this->authorize('view', $usulan);
 
-            $usulan->file_persyaratan = $usulan->file_persyaratan
-                ? Storage::url('uploads/' . $usulan->file_persyaratan)
-                : null;
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'OK',
+                'data'    => $usulan,
+            ], 200);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Unauthorized: Anda tidak memiliki akses ke usulan ini',
+            ], 403);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Usulan tidak ditemukan',
+                'error'   => $e->getMessage(),
+            ], 404);
+        } catch (Throwable $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Gagal mengambil data usulan',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getByOpd(String $kode_opd)
+    {
+        try {
+            $usulan = Usulan::with(['subJenisBantuan', 'kategori', 'opd', 'desa', 'spj'])->where('kode_opd', $kode_opd)->get();
+
+            // ✅ Authorization check
+
 
             return response()->json([
                 'code'    => 'success',
@@ -242,18 +257,24 @@ class UsulanController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+   public function update(Request $request, string $id)
     {
+        DB::beginTransaction();
+
         try {
             $usulan = Usulan::findOrFail($id);
-            // ✅ Authorization check
+
+            // Authorization
             $this->authorize('update', $usulan);
 
+            // Simpan status lama
+            $oldStatus = $usulan->status;
+
+            // Validasi
             $validated = $request->validate([
                 'judul'              => ['sometimes', 'string', 'max:255'],
                 'anggaran_usulan'    => ['sometimes', 'integer', 'min:0'],
                 'anggaran_disetujui' => ['sometimes', 'integer', 'min:0'],
-                'file_persyaratan'   => ['sometimes', 'file', 'max:2048'],
                 'email'              => ['sometimes', 'email', 'max:50'],
                 'nohp'               => ['sometimes', 'string', 'max:15'],
                 'nama'               => ['sometimes', 'string', 'max:100'],
@@ -262,66 +283,170 @@ class UsulanController extends Controller
                 'idkategori'         => ['sometimes', 'integer', 'exists:kategori,idkategori'],
                 'iddesa'             => ['sometimes', 'integer', 'exists:desa,iddesa'],
                 'kode_opd'           => ['sometimes', 'string', 'exists:opd,kode_opd'],
-                'nama_lembaga'      => ['sometimes', 'string', 'max:255'],
-                'catatan_ditolak'   => ['sometimes', 'string', 'max:500'],
-                'tahun'              => ['sometimes', 'digits:4', 'integer', 'min:1900'],
-
-                // ✅ Validasi: no_sk hanya boleh 1x per tahun (kecuali record ini sendiri)
-                'no_sk' => [
-                    'sometimes',
-                    'string',
-                    'max:75',
-                    function ($attribute, $value, $fail) use ($usulan, $request) {
-                        // Tahun yang dipakai untuk pembatasan (umumnya tahun berjalan)
-                        $tahun = date('Y');
-
-                        $exists = Usulan::where('no_sk', $value)
-                            ->whereYear('created_at', $tahun)
-                            ->where('idusulan', '!=', $usulan->idusulan) // abaikan record yang sedang diupdate
-                            ->exists();
-
-                        if ($exists) {
-                            $fail("Nomor SK {$value} sudah digunakan pada tahun {$tahun}.");
-                        }
-                    },
-                ],
+                'catatan_ditolak'    => ['sometimes', 'string', 'max:500'],
+                'tahun'              => ['sometimes', 'digits:4'],
             ]);
 
-            // ==== Handle file jika diupload ulang
-            if ($request->hasFile('file_persyaratan')) {
-                $oldFile = (string) $usulan->file_persyaratan;
-                if ($oldFile && Storage::exists('public/uploads/' . $oldFile)) {
-                    Storage::delete('public/uploads/' . $oldFile);
-                }
-
-                $file = $request->file('file_persyaratan');
-                $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('uploads', $filename, 'public');
-                $validated['file_persyaratan'] = $filename;
-            }
-
+            // Update data
             $usulan->update($validated);
             log_bantuan(['id_fk' => $usulan->idusulan]);
+
+            // ===============================
+            // 🔔 KIRIM WHATSAPP JIKA STATUS BERUBAH
+            // ===============================
+            if (
+                array_key_exists('status', $validated) &&
+                $oldStatus !== $validated['status']
+            ) {
+                $no_hp = $usulan->nohp;
+
+                if ($no_hp) {
+                    $cek_valid_wa = json_decode(
+                        validate_whatsapp(getTokenFonte(), $no_hp)
+                    );
+
+                    if ($cek_valid_wa && $cek_valid_wa->status) {
+                        if (empty($cek_valid_wa->not_registered)) {
+
+                            $pesan = match ($usulan->status) {
+                                'disetujui' =>
+                                    "✅ *Usulan Disetujui*\n\nJudul: {$usulan->judul}",
+
+                                'diterima' =>
+                                    "🎉 *Usulan Diterima*\n\nJudul: {$usulan->judul}",
+
+                                'ditolak' =>
+                                    "❌ *Usulan Ditolak*\n\nCatatan:\n{$usulan->catatan_ditolak}",
+
+                                default =>
+                                    "📌 Status usulan diperbarui menjadi *{$usulan->status}*",
+                            };
+
+                            // Kirim WA
+                            send_whatsapp(
+                                getTokenFonte(),
+                                $no_hp,
+                                $pesan
+                            );
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
 
             return response()->json([
                 'code'    => 'success',
                 'message' => 'Usulan berhasil diperbarui',
                 'data'    => $usulan->fresh(),
             ], 200);
+
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            DB::rollBack();
             return response()->json([
                 'code'    => 'error',
-                'message' => 'Unauthorized: Anda tidak memiliki akses untuk mengubah usulan ini',
+                'message' => 'Unauthorized',
             ], 403);
-        } catch (ModelNotFoundException $e) {
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            DB::rollBack();
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Usulan tidak ditemukan',
             ], 404);
+
         } catch (Throwable $e) {
+            DB::rollBack();
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Gagal memperbarui usulan',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function updateStatus(Request $request, string $id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $usulan = Usulan::findOrFail($id);
+
+            // Authorization
+            $this->authorize('update', $usulan);
+
+            // Validasi request
+            $validated = $request->validate([
+                'status' => ['required', Rule::in(['diusulkan', 'disetujui', 'diterima', 'ditolak'])],
+            ]);
+
+            // Update status
+            $usulan->update($validated);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
+
+            // ================================
+            // 🔔 KIRIM NOTIFIKASI WHATSAPP
+            // ================================
+            $no_hp = $usulan->nohp;
+
+            if ($no_hp) {
+                $cek_valid_wa = json_decode(
+                    validate_whatsapp(getTokenFonte(), $no_hp)
+                );
+
+                if ($cek_valid_wa && $cek_valid_wa->status) {
+                    if (empty($cek_valid_wa->not_registered)) {
+
+                        $pesan = match ($usulan->status) {
+                            'disetujui' => "✅ *Usulan Anda Disetujui*\n\nJudul: {$usulan->judul}",
+                            'ditolak'   => "❌ *Usulan Anda Ditolak*\n\nCatatan: {$usulan->catatan_ditolak}",
+                            'diterima'  => "🎉 *Usulan Anda Diterima*",
+                            default     => "📌 Status usulan diperbarui menjadi *{$usulan->status}*",
+                        };
+
+                        $send = json_decode(
+                            send_whatsapp(getTokenFonte(), $no_hp, $pesan)
+                        );
+                        if (!$send || !$send->status) {
+                            DB::commit();
+
+                            return response()->json([
+                                'code'    => 'warning',
+                                'message' => 'Status berhasil diupdate, namun pesan WhatsApp gagal dikirim',
+                                'data'    => $usulan->fresh(),
+                            ], 200);
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'Status usulan berhasil diperbarui & notifikasi dikirim',
+                'data'    => $usulan->fresh(),
+            ], 200);
+
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Unauthorized',
+            ], 403);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            DB::rollBack();
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Usulan tidak ditemukan',
+            ], 404);
+
+        } catch (Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Gagal memperbarui status usulan',
                 'error'   => $e->getMessage(),
             ], 500);
         }
@@ -338,9 +463,6 @@ class UsulanController extends Controller
             // ✅ Authorization check - hanya admin yang bisa hapus
             $this->authorize('delete', $usulan);
 
-            if ($usulan->file_persyaratan && Storage::exists('public/uploads/' . $usulan->file_persyaratan)) {
-                Storage::delete('public/uploads/' . $usulan->file_persyaratan);
-            }
 
             $usulan->delete();
             log_bantuan(['id_fk' => $usulan->idusulan]);

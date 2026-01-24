@@ -286,25 +286,20 @@ if ($search = trim($request->input('q'))) {
                 'idusulan' => ['required', 'integer', 'exists:usulan,idusulan'],
 
                 // file rar/zip max 2MB
-                'file_pertanggungjawaban'   => ['required', 'file', 'max:2048'],
                 'foto'   => ['required', 'file', 'max:2048', 'mimes:jpg,jpeg,png'],
 
                 'realisasi'              => ['required', 'integer', 'min:0'],
 
                 // ✅ ENUM status
-                'status'             => ['required', Rule::in(['diusulkan', 'disetujui'])]
+                'status'             => ['required', Rule::in(['proses', 'selesai'])]
             ]);
 
-            $filepj = $request->file('file_pertanggungjawaban');
-            $filepjname = Str::uuid() . '.' . $filepj->getClientOriginalExtension();
-            $path = $filepj->storeAs('uploads', $filepjname, 'public'); // simpan ke storage/app/public/uploads
 
             $foto = $request->file('foto');
             $fotoname = Str::uuid() . '.' . $foto->getClientOriginalExtension();
             $path = $foto->storeAs('uploads', $fotoname, 'public'); // simpan ke storage/app/public/uploads
 
             // masukkan nama atau path file ke data yang akan disimpan
-            $validated['file_pertanggungjawaban'] = $filepjname; // atau: Storage::url($path) jika ingin menyimpan URL publik
             $validated['foto'] = $fotoname; // atau: Storage::url($path) jika ingin menyimpan URL publik
             $id_user = Auth::check() ? Auth::user()->iduser : null;
             $validated['created_by'] = $id_user;
@@ -334,7 +329,6 @@ if ($search = trim($request->input('q'))) {
     {
         try {
            $spj = Spj::with(['usulan'])->findOrFail($id);
-           $spj->file_pertanggungjawaban = $spj->file_pertanggungjawaban ? Storage::url('uploads/' . $spj->file_pertanggungjawaban) : null;
            $spj->foto = $spj->foto ? Storage::url('uploads/' . $spj->foto) : null;
             return response()->json([
                 'code'    => 'success',
@@ -351,55 +345,92 @@ if ($search = trim($request->input('q'))) {
 
     }
 
+    public function getByOpd(string $kode_opd)
+    {
+        try {
+            $spj = Spj::with('usulan')
+                ->whereHas('usulan', function ($q) use ($kode_opd) {
+                    $q->where('kode_opd', $kode_opd);
+                })
+                ->get();
+
+            // mapping url foto
+            $spj->each(function ($item) {
+                $item->foto = $item->foto
+                    ? Storage::url('uploads/' . $item->foto)
+                    : null;
+            });
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'OK',
+                'data'    => $spj,
+            ], 200);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'SPJ tidak ditemukan',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, String $id)
+    public function update(Request $request, string $id)
     {
+        DB::beginTransaction();
+
         try {
-            $spj = Spj::findOrFail($id);
+            $spj = Spj::with('usulan')->findOrFail($id);
+
+            $oldStatus = $spj->status;
+
             $validated = $request->validate([
-               'idusulan' => ['sometimes', 'integer', 'exists:usulan,idusulan'],
-
-                // file rar/zip max 2MB
-                'file_pertanggungjawaban'   => ['sometimes', 'file', 'max:2048'],
-                'foto'   => ['sometimes', 'file', 'max:2048', 'mimes:jpg,jpeg,png'],
-
-                'realisasi'              => ['sometimes', 'integer', 'min:0'],
-
-                // ✅ ENUM status
-                'status'             => ['sometimes', Rule::in(['diusulkan', 'disetujui'])]
+                'idusulan'  => ['sometimes', 'integer', 'exists:usulan,idusulan'],
+                'foto'      => ['sometimes', 'file', 'max:2048', 'mimes:jpg,jpeg,png'],
+                'realisasi' => ['sometimes', 'integer', 'min:0'],
+                'status'    => ['sometimes', Rule::in(['proses', 'selesai'])],
             ]);
 
-            if ($request->hasFile('file_pertanggungjawaban')) {
-                // hapus file lama jika ada
-                $oldFilepj = (string) $spj->file_pertanggungjawaban;
-                if ($oldFilepj && Storage::exists('public/uploads/' . $oldFilepj)) {
-                    Storage::delete('public/uploads/' . $oldFilepj);
+            // upload foto
+            if ($request->hasFile('foto')) {
+                if ($spj->foto && Storage::exists('public/uploads/' . $spj->foto)) {
+                    Storage::delete('public/uploads/' . $spj->foto);
                 }
 
-                // hapus file lama jika ada
-                $oldFilefoto = (string) $spj->foto;
-                if ($oldFilefoto && Storage::exists('public/uploads/' . $oldFilefoto)) {
-                    Storage::delete('public/uploads/' . $oldFilefoto);
-                }
-
-                $file = $request->file('file_pertanggungjawaban');
+                $file = $request->file('foto');
                 $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
                 $file->storeAs('uploads', $filename, 'public');
-                $validated['file_pertanggungjawaban'] = $filename;
+                $validated['foto'] = $filename;
             }
-            $id_user = Auth::check() ? Auth::user()->iduser : null;
-             $validated['updated_by'] = $id_user;
+
+            $validated['updated_by'] = Auth::check() ? Auth::user()->iduser : null;
 
             $spj->update($validated);
             log_bantuan(['id_fk' => $spj->idspj]);
+
+            // ===============================
+            // 🔔 KIRIM WA JIKA STATUS BERUBAH
+            // ===============================
+            if (
+                array_key_exists('status', $validated) &&
+                $oldStatus !== $validated['status']
+            ) {
+                $this->sendWaStatusSpj($spj);
+            }
+
+            DB::commit();
+
             return response()->json([
                 'message' => 'SPJ berhasil diperbarui',
-                'data'    => $spj->fresh(),
+                'data'    => $spj->fresh('usulan'),
             ], 200);
 
-        } catch (Throwable|ModelNotFoundException $e) {
+        } catch (Throwable $e) {
+            DB::rollBack();
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Gagal memperbarui SPJ',
@@ -407,6 +438,45 @@ if ($search = trim($request->input('q'))) {
             ], 500);
         }
     }
+
+
+
+   public function updateStatus(Request $request, string $id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $spj = Spj::with('usulan')->findOrFail($id);
+
+            $validated = $request->validate([
+                'status' => ['required', Rule::in(['proses', 'selesai'])],
+            ]);
+
+            // cek kalau status sama, tidak kirim WA
+            if ($spj->status !== $validated['status']) {
+                $spj->update($validated);
+                log_bantuan(['id_fk' => $spj->idspj]);
+
+                $this->sendWaStatusSpj($spj);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Status SPJ berhasil diperbarui',
+                'data'    => $spj->fresh('usulan'),
+            ], 200);
+
+        } catch (Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Gagal memperbarui status SPJ',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
 
     /**
      * Remove the specified resource from storage.
@@ -437,5 +507,45 @@ if ($search = trim($request->input('q'))) {
                 'error'   => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function sendWaStatusSpj(Spj $spj): void
+    {
+        if (!$spj->usulan || !$spj->usulan->nohp) {
+            return;
+        }
+
+        $no_hp = $spj->usulan->nohp;
+
+        $cek_valid_wa = json_decode(
+            validate_whatsapp(getTokenFonte(), $no_hp)
+        );
+
+        if (!$cek_valid_wa || !$cek_valid_wa->status) {
+            return;
+        }
+
+        if (!empty($cek_valid_wa->not_registered)) {
+            return;
+        }
+
+        $pesan = match ($spj->status) {
+            'proses' =>
+                "📄 *SPJ Sedang Diproses*\n\nRealisasi: Rp " .
+                number_format($spj->realisasi, 0, ',', '.'),
+
+            'selesai' =>
+                "✅ *SPJ Telah Selesai*\n\nRealisasi: Rp " .
+                number_format($spj->realisasi, 0, ',', '.'),
+
+            default =>
+                "📌 Status SPJ diperbarui",
+        };
+
+        send_whatsapp(
+            getTokenFonte(),
+            $no_hp,
+            $pesan
+        );
     }
 }

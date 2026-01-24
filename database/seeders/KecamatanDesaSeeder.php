@@ -5,24 +5,20 @@ namespace Database\Seeders;
 use App\Models\Desa;
 use App\Models\Kecamatan;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class KecamatanDesaSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-
         Desa::truncate();
         Kecamatan::truncate();
 
         $data = [
+            // idkecamatan = 1
             [
                 'kecamatan' => 'Bintauna',
                 'desa' => [
+                    'Bintauna',
                     'Batulintik',
                     'Bintauna Pantai',
                     'Bunia',
@@ -36,151 +32,151 @@ class KecamatanDesaSeeder extends Seeder
                     'Padang Barat',
                     'Pimpi',
                     'Talaga',
-                    'Voa A',
-                    'Vahuta',
-                    'Bintauna' // Kelurahan
+                    "Voa'a",
+                    'Vahuta'
                 ]
             ],
+
+            // idkecamatan = 2
             [
                 'kecamatan' => 'Bolangitang Barat',
                 'desa' => [
+                    'Paku Selatan',
+                    'Ollot II',
+                    'Paku',
+                    'Talaga',
+                    'Tote',
+                    'Wakat',
                     'Bolangitang',
                     'Bolangitang I',
                     'Bolangitang II',
-                    'Jambusarang',
-                    'Talaga Tomoagu',
                     'Iyok',
+                    'Jambusarang',
                     'Keimanga',
                     'Langi',
-                    'Ollot',
                     'Ollot I',
-                    'Ollot II',
-                    'Paku',
-                    'Paku Selatan',
+                    'Ollot',
                     'Sonuo',
-                    'Talaga',
-                    'Tanjung Buaya',
-                    'Tote',
-                    'Wakat'
+                    'Talaga Tomoagu',
+                    'Tanjung Buaya'
                 ]
             ],
+
+            // idkecamatan = 3
             [
                 'kecamatan' => 'Bolangitang Timur',
                 'desa' => [
-                    'Binjeita',
-                    'Binjeita I',
-                    'Binjeita II',
                     'Binuanga',
                     'Binuni',
-                    'Biontong',
-                    'Biontong I',
-                    'Biontong II',
+                    'Binjeita',
                     'Bohabak I',
-                    'Bohabak II',
                     'Bohabak III',
                     'Bohabak IV',
-                    'Lipu Bogu',
                     'Mokoditek',
                     'Mokoditek I',
-                    'Nagara',
                     'Nunuka',
                     'Saleo',
                     'Saleo Satu',
-                    'Tanjung Labou'
+                    'Tanjung Labou',
+                    'Binjeita I',
+                    'Binjeita II',
+                    'Biontong',
+                    'Biontong I',
+                    'Biontong II',
+                    'Bohabak II',
+                    'Lipu Bogu',
+                    'Nagara'
                 ]
             ],
+
+            // idkecamatan = 4
             [
                 'kecamatan' => 'Kaidipang',
                 'desa' => [
-                    'Bigo',
                     'Bigo Selatan',
-                    'Boroko',
-                    'Boroko Timur',
                     'Boroko Utara',
+                    'Boroko',
                     'Gihang',
                     'Inomunga',
                     'Inomunga Utara',
-                    'Komus II',
                     'Komus Dua Timur',
+                    'Bigo',
+                    'Boroko Timur',
+                    'Komus II',
                     'Kuala',
                     'Kuala Utara',
+                    'Solo',
                     'Pontak',
-                    'Soligir',
-                    'Solo'
+                    'Soligir'
                 ]
             ],
+
+            // idkecamatan = 5
             [
                 'kecamatan' => 'Pinogaluman',
                 'desa' => [
-                    'Batu Batayo',
-                    'Batutajam',
-                    'Buko',
+                    'Batu Tajam',
+                    'Busato',
+                    'Dalapuli Barat',
+                    'Dengi',
+                    'Tanjung Sidupa',
+                    'Tuntung',
+                    'Tuntung Timur',
+                    'Batu Bantayo',
                     'Buko Selatan',
                     'Buko Utara',
-                    'Busato',
+                    'Buko',
                     'Dalapuli',
-                    'Dalapuli Barat',
                     'Dalapuli Timur',
-                    'Dengi',
                     'Duini',
-                    'Kayuogu',
-                    'Komus Satu',
+                    'Kayu Ogu',
+                    'Komus I',
                     'Padango',
-                    'Tanjung Sidupa',
                     'Tambulang Pantai',
                     'Tambulang Timur',
                     'Tombulang',
-                    'Tontulow',
-                    'Tuntung',
-                    'Tuntung Timur',
+                    'Tuntulow',
                     'Tuntulow Utara'
                 ]
             ],
+
+            // idkecamatan = 6
             [
                 'kecamatan' => 'Sangkub',
                 'desa' => [
                     'Ampeng Sembeka',
                     'Busisingo',
                     'Busisingo Utara',
+                    'Sampiro',
+                    'Sang Tombolang',
+                    'Sangkub III',
                     'Mokusato',
                     'Monompia',
+                    'Sidodadi',
                     'Pangkusa',
-                    'Sampiro',
+                    'Sangkub Empat',
                     'Sangkub I',
                     'Sangkub II',
-                    'Sangkub III',
-                    'Sangkub IV',
                     'Sangkub Timur',
-                    'Sangtombolang',
-                    'Sidodadi',
                     'Suka Makmur',
                     'Tombolango'
                 ]
             ]
         ];
 
-        $totalKecamatan = 0;
-        $totalDesa = 0;
-
         foreach ($data as $item) {
-            // Create kecamatan
             $kecamatan = Kecamatan::create([
                 'namakecamatan' => $item['kecamatan']
             ]);
-            $totalKecamatan++;
 
-            // Create desa untuk kecamatan ini
-            foreach ($item['desa'] as $namaDesa) {
+            foreach ($item['desa'] as $desa) {
                 Desa::create([
                     'idkecamatan' => $kecamatan->idkecamatan,
-                    'namadesa' => $namaDesa
+                    'namadesa' => $desa
                 ]);
-                $totalDesa++;
             }
         }
 
-        $this->command->info("Seeder KecamatanDesa berhasil ditambahkan!");
-        $this->command->info("Total Kecamatan: {$totalKecamatan}");
-        $this->command->info("Total Desa: {$totalDesa}");
+        $this->command->info('Seeder Kecamatan & Desa berhasil dijalankan.');
     }
 }

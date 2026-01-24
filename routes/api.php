@@ -11,6 +11,12 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsulanController;
 use App\Http\Controllers\Api\KecamatanController;
 use App\Http\Controllers\Api\StatistikController;
+use App\Http\Controllers\Api\FilePersyaratanController;
+use App\Http\Controllers\Api\UsulanPersyaratanController;
+use App\Http\Controllers\Api\SpjPersyaratanController;
+
+use App\Http\Controllers\Api\TokenController;
+
 
 
 // Public routes (tanpa authentication)
@@ -48,6 +54,8 @@ Route::get('/opd-paginated', [OpdController::class, 'paginated']);
 
 Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
 Route::apiResource('spj', SpjController::class);
+Route::put('/spj/{id}/status', [SpjController::class, 'updateStatus']);
+Route::get('spj/getByOpd/{kode_opd}', [SpjController::class, 'getByOpd']);
 Route::get('/feed-bantuan', [SpjController::class, 'feedBantuan']);
 Route::get('/detail-bantuan', [SpjController::class, 'detailBantuan']);
 Route::get('/log-bantuan', [UsulanController::class, 'getLogs']);
@@ -59,6 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::put('/user/change-password', [AuthController::class, 'changePassword']);
+
+    Route::apiResource('token', TokenController::class);
 
     Route::apiResource('usulan', UsulanController::class);
     Route::apiResource('spj', SpjController::class);
@@ -89,8 +99,31 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [UsulanController::class, 'store']);
         Route::get('/{id}', [UsulanController::class, 'show']);
         Route::put('/{id}', [UsulanController::class, 'update']);
-        Route::delete('/{id}', [UsulanController::class, 'destroy']);
+        Route::put('/{id}/status', [UsulanController::class, 'updateStatus']);
+        Route::delete('/{id}', action: [UsulanController::class, 'destroy']);
         Route::post('/{id}/approve', [UsulanController::class, 'approve']);
         Route::get('/logs/all', [UsulanController::class, 'getLogs']);
+        Route::get('/getByOpd/{kode_opd}', [UsulanController::class, 'getByOpd']);
     });
+
+    Route::apiResource('file-persyaratan', FilePersyaratanController::class);
+    Route::apiResource('usulan-persyaratan', UsulanPersyaratanController::class);
+    Route::get(
+        'usulan-persyaratan/getByIdUsulan/{id}',
+        [UsulanPersyaratanController::class, 'getByIdUsulan']
+    );
+    Route::get(
+        'usulan-persyaratan/{id}/download',
+        [UsulanPersyaratanController::class, 'download']
+    );
+
+    Route::apiResource('spj-persyaratan', SpjPersyaratanController::class);
+     Route::get(
+        'spj-persyaratan/getByIdSpj/{id}',
+        [SpjPersyaratanController::class, 'getByIdSpj']
+    );
+    Route::get(
+        'spj-persyaratan/{id}/download',
+        [SpjPersyaratanController::class, 'download']
+    );
 });

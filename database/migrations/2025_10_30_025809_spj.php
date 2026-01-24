@@ -14,10 +14,9 @@ return new class extends Migration
         Schema::create('spj', function (Blueprint $table) {
             $table->integer('idspj', true);
             $table->integer('idusulan')->nullable();
-            $table->string('file_pertanggungjawaban', 100);
             $table->string('foto', 100);
             $table->integer('realisasi');
-            $table->enum('status', ['diusulkan', 'disetujui'])->nullable();
+            $table->enum('status', ['proses', 'selesai'])->nullable();
 
 
              // 🔗 Relasi

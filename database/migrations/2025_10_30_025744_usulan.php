@@ -15,7 +15,6 @@ return new class extends Migration
             $table->integer('idusulan', true);
             $table->text('judul')->nullable();
             $table->integer('anggaran_usulan')->nullable();
-            $table->string('file_persyaratan', 100)->nullable();
             $table->string('email', 30);
             $table->string('nohp', 12);
             $table->tinyInteger('idsubjenisbantuan');
@@ -25,8 +24,6 @@ return new class extends Migration
             $table->enum('status', ['diusulkan', 'disetujui', 'diterima', 'ditolak'])->nullable();
             $table->softDeletes(); // Add this line for soft delete
             $table->string('nama', 75);
-            $table->string('no_sk', 75)->comment('Nilai Berupa NO SK atau NO KTP');
-            $table->string('nama_lembaga', 75);
             $table->text('catatan_ditolak')->nullable();
             $table->year('tahun')->default(date('Y'));
 
@@ -39,13 +36,6 @@ return new class extends Migration
 
     public function down()
     {
-          Schema::table('spj', function (Blueprint $table) {
-            // Lepas foreign key terlebih dahulu
-            $table->dropForeign(['idusulan']);
-            $table->dropForeign(['created_by']);
-            $table->dropForeign(['updated_by']);
-        });
-
-        Schema::dropIfExists('spj');
+        Schema::dropIfExists('usulan');
     }
 };

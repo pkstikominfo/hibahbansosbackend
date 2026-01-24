@@ -17,7 +17,6 @@ class Spj extends Model
 
     protected $fillable = [
         'idusulan',
-        'file_pertanggungjawaban',
         'foto',
         'realisasi',
         'status',
