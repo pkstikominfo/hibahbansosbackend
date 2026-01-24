@@ -28,4 +28,23 @@ class JenisBantuanController extends Controller
             ], 500);
         }
     }
+
+    public function show(String $id_jenisbantuan)
+    {
+         try {
+            $jenisBantuan = JenisBantuan::findOrFail($id_jenisbantuan);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data jenis bantuan berhasil diambil',
+                'data' => $jenisBantuan
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data kategori',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

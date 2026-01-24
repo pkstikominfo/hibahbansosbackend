@@ -1,30 +1,26 @@
 <?php
 
 namespace App\Http\Controllers\Api;
-use App\Models\Kategori;
-use Throwable;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Throwable;
+use App\Models\SubJenisBantuan;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
-
-class KategoriController extends Controller
+class SubJenisBantuanController extends Controller
 {
-    /**
-     * GET: tampilkan semua data kategori
-     */
     public function index()
     {
-        try {
-            $kategori = Kategori::with('jenisBantuan')->get();
+         try {
+            $subJenisBantuan = SubJenisBantuan::all();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data kategori berhasil diambil',
-                'data' => $kategori
+                'message' => 'Data sub jenis bantuan berhasil diambil',
+                'data' => $subJenisBantuan
             ], 200);
-
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengambil data kategori',
@@ -34,10 +30,11 @@ class KategoriController extends Controller
     }
 
 
-     public function show(String $id_kategori)
+
+     public function show(String $id_subjenisbantuan)
     {
         try {
-            $kategori = Kategori::with(['jenisBantuan'])->findOrFail($id_kategori);
+            $subjenisbantuan = SubJenisBantuan::with(['jenisBantuan'])->findOrFail($id_subjenisbantuan);
 
             // ✅ Authorization check
 
@@ -45,23 +42,23 @@ class KategoriController extends Controller
             return response()->json([
                 'code'    => 'success',
                 'message' => 'OK',
-                'data'    => $kategori,
+                'data'    => $subjenisbantuan,
             ], 200);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return response()->json([
                 'code'    => 'error',
-                'message' => 'Unauthorized: Anda tidak memiliki akses ke kategori ini',
+                'message' => 'Unauthorized: Anda tidak memiliki akses ke Subjenis Bantuan ini',
             ], 403);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'error',
-                'message' => 'Kategori tidak ditemukan',
+                'message' => 'Subjenis Bantuan tidak ditemukan',
                 'error'   => $e->getMessage(),
             ], status: 404);
         } catch (Throwable $e) {
             return response()->json([
                 'code'    => 'error',
-                'message' => 'Gagal mengambil data kategori',
+                'message' => 'Gagal mengambil data sub jenis bantuan',
                 'error'   => $e->getMessage(),
             ], 500);
         }
@@ -70,7 +67,7 @@ class KategoriController extends Controller
      public function getByJenisBantuan(String $id_jenisbantuan)
     {
         try {
-            $kategori = Kategori::with(['jenisBantuan'])->where('idjenisbantuan', $id_jenisbantuan)->get();
+            $subjenisbantuan = SubJenisBantuan::with(['jenisBantuan'])->where('idjenisbantuan', $id_jenisbantuan)->get();
 
             // ✅ Authorization check
 
@@ -78,26 +75,51 @@ class KategoriController extends Controller
             return response()->json([
                 'code'    => 'success',
                 'message' => 'OK',
-                'data'    => $kategori,
+                'data'    => $subjenisbantuan,
             ], 200);
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return response()->json([
                 'code'    => 'error',
-                'message' => 'Unauthorized: Anda tidak memiliki akses ke kategori ini',
+                'message' => 'Unauthorized: Anda tidak memiliki akses ke Subjenis Bantuan ini',
             ], 403);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'error',
-                'message' => 'Kategori tidak ditemukan',
+                'message' => 'Subjenis Bantuan tidak ditemukan',
                 'error'   => $e->getMessage(),
             ], status: 404);
         } catch (Throwable $e) {
             return response()->json([
                 'code'    => 'error',
-                'message' => 'Gagal mengambil data kategori',
+                'message' => 'Gagal mengambil data sub jenis bantuan',
                 'error'   => $e->getMessage(),
             ], 500);
         }
     }
 
+    public function getByKategori(string $idkategori)
+    {
+        try {
+            $subJenisBantuan = SubJenisBantuan::with('jenisBantuan')
+                ->whereHas('jenisBantuan', function ($q) use ($idkategori) {
+                    $q->whereHas('kategori', function ($k) use ($idkategori) {
+                        $k->where('idkategori', $idkategori);
+                    });
+                })
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data sub jenis bantuan berdasarkan kategori',
+                'data'    => $subJenisBantuan,
+            ], 200);
+
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data sub jenis bantuan',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

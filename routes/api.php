@@ -14,6 +14,10 @@ use App\Http\Controllers\Api\StatistikController;
 use App\Http\Controllers\Api\FilePersyaratanController;
 use App\Http\Controllers\Api\UsulanPersyaratanController;
 use App\Http\Controllers\Api\SpjPersyaratanController;
+use App\Http\Controllers\Api\SubJenisBantuanController;
+use App\Http\Controllers\Api\JenisBantuanController;
+use App\Http\Controllers\Api\KategoriController;
+
 
 use App\Http\Controllers\Api\TokenController;
 
@@ -67,6 +71,82 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::put('/user/change-password', [AuthController::class, 'changePassword']);
+
+   Route::prefix('sub-jenis-bantuan')->group(function () {
+
+    Route::get('/',
+        [SubJenisBantuanController::class, 'index']
+    );
+
+    // by ID sub jenis bantuan
+    Route::get('/detail/{id_subjenisbantuan}',
+        [SubJenisBantuanController::class, 'show']
+    );
+
+    // by jenis bantuan
+    Route::get('/jenis/{id_jenisbantuan}',
+        [SubJenisBantuanController::class, 'getByJenisBantuan']
+    );
+
+    // by kategori
+    Route::get('/kategori/{id_kategori}',
+        [SubJenisBantuanController::class, 'getByKategori']
+    );
+
+});
+   Route::prefix('sub-jenis-bantuan')->group(function () {
+        Route::get('/',
+            [SubJenisBantuanController::class, 'index']
+        );
+
+        // by ID sub jenis bantuan
+        Route::get('/detail/{id_subjenisbantuan}',
+            [SubJenisBantuanController::class, 'show']
+        );
+
+        // by jenis bantuan
+        Route::get('/jenis/{id_jenisbantuan}',
+            [SubJenisBantuanController::class, 'getByJenisBantuan']
+        );
+
+        // by kategori
+        Route::get('/kategori/{id_kategori}',
+            [SubJenisBantuanController::class, 'getByKategori']
+        );
+
+    });
+
+    Route::prefix('kategori')->group(function () {
+
+        Route::get('/',
+            [KategoriController::class, 'index']
+        );
+
+        // by ID sub jenis bantuan
+        Route::get('/detail/{id_kategori}',
+            [KategoriController::class, 'show']
+        );
+
+        // by jenis bantuan
+        Route::get('/jenis/{id_jenisbantuan}',
+            [KategoriController::class, 'getByJenisBantuan']
+        );
+
+    });
+
+    Route::prefix('jenis-bantuan')->group(function () {
+
+        Route::get('/',
+            [JenisBantuanController::class, 'index']
+        );
+
+        // by ID sub jenis bantuan
+        Route::get('/detail/{id_jenisbantuan}',
+            [JenisBantuanController::class, 'show']
+        );
+
+    });
+
 
     Route::apiResource('token', TokenController::class);
 
@@ -126,4 +206,7 @@ Route::middleware('auth:sanctum')->group(function () {
         'spj-persyaratan/{id}/download',
         [SpjPersyaratanController::class, 'download']
     );
+
+
+
 });
