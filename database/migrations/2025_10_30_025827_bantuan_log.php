@@ -18,7 +18,7 @@ return new class extends Migration
             $table->dateTime('tanggal')->nullable();
             $table->enum('tipe', ['usulan', 'spj'])->default('usulan');
 
-            $table->foreign('iduser')->references('iduser')->on('users');
+            $table->foreign('iduser')->references('id')->on('users');
         });
     }
 
