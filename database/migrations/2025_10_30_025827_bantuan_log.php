@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('bantuan_log', function (Blueprint $table) {
             $table->integer('idlog', true);
             $table->integer('id_fk')->nullable();
-            $table->integer('iduser')->nullable();
+            $table->unsignedBigInteger('iduser')->nullable();
             $table->dateTime('tanggal')->nullable();
             $table->enum('tipe', ['usulan', 'spj'])->default('usulan');
 
