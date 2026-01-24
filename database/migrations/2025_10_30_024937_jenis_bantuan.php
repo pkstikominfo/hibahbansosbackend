@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('jenis_bantuan', function (Blueprint $table) {
             $table->tinyInteger('idjenisbantuan', true);
             $table->string('namajenisbantuan', 30)->nullable();
-            $table->text('keterangan')->nullable();
         });
     }
 
