@@ -150,7 +150,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('token', TokenController::class);
 
-    Route::apiResource('usulan', UsulanController::class);
     Route::apiResource('spj', SpjController::class);
 
     Route::middleware('role:admin')->group(function () {
@@ -176,7 +175,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('usulan')->group(function () {
         Route::get('/', [UsulanController::class, 'index']);
-        Route::post('/', [UsulanController::class, 'store']);
         Route::get('/{id}', [UsulanController::class, 'show']);
         Route::put('/{id}', [UsulanController::class, 'update']);
         Route::put('/{id}/status', [UsulanController::class, 'updateStatus']);
@@ -186,7 +184,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/getByOpd/{kode_opd}', [UsulanController::class, 'getByOpd']);
     });
 
-    Route::apiResource('file-persyaratan', FilePersyaratanController::class);
+    // File Persyaratan Routes
+    Route::post(
+        'file-persyaratan',
+        [FilePersyaratanController::class, 'store']
+    );
+    Route::put(
+            'file-persyaratan/{id}',
+            [FilePersyaratanController::class, 'update']
+        );
+    Route::delete(
+            'file-persyaratan/{id}',
+            [FilePersyaratanController::class, 'destroy']
+        );
+    // Usulan Persyaratan Routes
+
     Route::apiResource('usulan-persyaratan', UsulanPersyaratanController::class);
     Route::get(
         'usulan-persyaratan/getByIdUsulan/{id}',
@@ -210,3 +222,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 });
+
+// buat usulan baru (public)
+Route::post('usulan', [UsulanController::class, 'store']);
+
+// Public File Persyaratan Routes
+ Route::get(
+        'file-persyaratan',
+        [FilePersyaratanController::class, 'index']
+    );
+ Route::get(
+        'file-persyaratan/{id}',
+        [FilePersyaratanController::class, 'show']
+    );

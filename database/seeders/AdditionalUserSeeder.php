@@ -17,7 +17,6 @@ class AdditionalUserSeeder extends Seeder
     {
         // Ambil semua OPD yang ada
         $opds = Opd::all();
-        $this->call(OpdSeeder::class);
         // Data user OPD (8 user)
         $opdUsers = [
             [
