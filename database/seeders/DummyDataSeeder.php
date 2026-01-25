@@ -7,12 +7,30 @@ use Illuminate\Support\Facades\DB;
 use Faker\Factory as Faker;
 use App\Models\Usulan;
 use App\Models\Spj;
+use Illuminate\Support\Facades\Schema;
 
 class DummyDataSeeder extends Seeder
 {
     public function run()
     {
+        Schema::disableForeignKeyConstraints();
+
+        DB::table('spj_persyaratan')->truncate();
+        DB::table('spj')->truncate();
+        DB::table('usulan_persyaratan')->truncate();
+        Usulan::truncate(); // Bisa pakai Model::truncate() atau DB::table()->truncate()
+        DB::table('file_persyaratan')->truncate();
+
+        // Hidupkan kembali pengecekan Foreign Key
+        Schema::enableForeignKeyConstraints();
+
+        $this->command->info('Data lama berhasil dihapus/dikosongkan.');
+
         $faker = Faker::create('id_ID');
+
+        // Nama file dummy yang sudah Anda taruh di storage/app/public/uploads/
+        // Pastikan file 'dummy.jpg' benar-benar ada di sana.
+        $dummyFile = 'dummy.png';
 
         // Range ID dari SQL Dump
         $opdCodes = [];
@@ -63,13 +81,9 @@ class DummyDataSeeder extends Seeder
 
             $catatan = ($status == 'ditolak') ? $faker->sentence() : null;
 
-            // PERBAIKAN:
-            // 1. nohp: Pakai numerify agar pas 12 digit (misal: 0812xxxxxxxx)
-            // 2. email: Pakai format manual agar < 30 karakter (misal: user283@tes.com)
             $usulan = Usulan::create([
                 'judul' => 'Permohonan Bantuan ' . $faker->words(3, true),
                 'anggaran_usulan' => $anggaranUsulan,
-                // Generate email pendek: 'user' + angka acak + '@tes.com' (total ~15 char)
                 'email' => 'user' . $faker->unique()->numberBetween(1, 9999) . '@tes.com',
                 'nohp' => $faker->numerify('08##########'),
                 'idsubjenisbantuan' => $faker->randomElement($subJenisIds),
@@ -77,7 +91,7 @@ class DummyDataSeeder extends Seeder
                 'anggaran_disetujui' => $anggaranDisetujui,
                 'kode_opd' => $faker->randomElement($opdCodes),
                 'status' => $status,
-                'nama' => $faker->name, // Nama orang Indonesia kadang panjang, tapi biasanya < 75 char (aman)
+                'nama' => $faker->name,
                 'catatan_ditolak' => $catatan,
                 'tahun' => 2026,
                 'iddesa' => $faker->randomElement($desaIds),
@@ -96,7 +110,7 @@ class DummyDataSeeder extends Seeder
             DB::table('usulan_persyaratan')->insert([
                 'idusulan' => $faker->randomElement($usulanIds),
                 'id_fp' => $faker->randomElement($filePersyaratanIds),
-                'file_persyaratan' => 'dummy_syarat_' . $faker->uuid . '.pdf',
+                'file_persyaratan' => $dummyFile, // MENGGUNAKAN FILE ASLI
             ]);
         }
         $this->command->info('Berhasil membuat 20 Usulan Persyaratan.');
@@ -121,7 +135,7 @@ class DummyDataSeeder extends Seeder
 
             $spj = Spj::create([
                 'idusulan' => $idUsulan,
-                'foto' => 'kegiatan_' . $faker->uuid . '.jpg',
+                'foto' => $dummyFile, // MENGGUNAKAN FILE ASLI
                 'realisasi' => $usulan->anggaran_disetujui ?? $usulan->anggaran_usulan,
                 'status' => $faker->randomElement(['proses', 'selesai']),
                 'created_by' => $faker->randomElement($pengusulIds),
@@ -139,7 +153,7 @@ class DummyDataSeeder extends Seeder
             for ($i = 0; $i < 20; $i++) {
                 DB::table('spj_persyaratan')->insert([
                     'idspj' => $faker->randomElement($spjIds),
-                    'file_persyaratan' => 'bukti_belanja_' . $faker->uuid . '.pdf',
+                    'file_persyaratan' => $dummyFile, // MENGGUNAKAN FILE ASLI
                 ]);
             }
             $this->command->info('Berhasil membuat 20 SPJ Persyaratan.');
