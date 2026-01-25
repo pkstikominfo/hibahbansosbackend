@@ -63,18 +63,21 @@ class DummyDataSeeder extends Seeder
 
             $catatan = ($status == 'ditolak') ? $faker->sentence() : null;
 
-            // PERBAIKAN DI SINI: Menggunakan numerify agar pas 12 digit
+            // PERBAIKAN:
+            // 1. nohp: Pakai numerify agar pas 12 digit (misal: 0812xxxxxxxx)
+            // 2. email: Pakai format manual agar < 30 karakter (misal: user283@tes.com)
             $usulan = Usulan::create([
                 'judul' => 'Permohonan Bantuan ' . $faker->words(3, true),
                 'anggaran_usulan' => $anggaranUsulan,
-                'email' => $faker->email,
-                'nohp' => $faker->numerify('08##########'), // 12 Digit (misal: 081234567890)
+                // Generate email pendek: 'user' + angka acak + '@tes.com' (total ~15 char)
+                'email' => 'user' . $faker->unique()->numberBetween(1, 9999) . '@tes.com',
+                'nohp' => $faker->numerify('08##########'),
                 'idsubjenisbantuan' => $faker->randomElement($subJenisIds),
                 'idkategori' => $faker->randomElement($kategoriIds),
                 'anggaran_disetujui' => $anggaranDisetujui,
                 'kode_opd' => $faker->randomElement($opdCodes),
                 'status' => $status,
-                'nama' => $faker->name,
+                'nama' => $faker->name, // Nama orang Indonesia kadang panjang, tapi biasanya < 75 char (aman)
                 'catatan_ditolak' => $catatan,
                 'tahun' => 2026,
                 'iddesa' => $faker->randomElement($desaIds),
@@ -102,7 +105,6 @@ class DummyDataSeeder extends Seeder
         // 4. SEEDER SPJ (20 Data)
         // ======================================================
         $spjIds = [];
-        // Pastikan ada cukup usulan untuk diambil 20 sample, jika kurang ambil semua
         $countUsulan = count($usulanIds);
         $amountToTake = $countUsulan < 20 ? $countUsulan : 20;
 
