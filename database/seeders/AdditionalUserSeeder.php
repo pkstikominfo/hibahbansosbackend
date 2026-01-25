@@ -18,6 +18,19 @@ class AdditionalUserSeeder extends Seeder
         // Ambil semua OPD yang ada
         $opds = Opd::all();
         // Data user OPD (8 user)
+
+        $adminUsers = [
+            [
+                'username' => 'admin_super',
+                'name' => 'Administrator Utama',
+                'email' => 'admin@example.com',
+                'nohp' => '081111111111',
+                'peran' => 'admin',
+                'kode_opd' => null
+            ]
+        ];
+
+
         $opdUsers = [
             [
                 'username' => 'opd_dinkes',
@@ -147,9 +160,11 @@ class AdditionalUserSeeder extends Seeder
 
         $totalCreated = 0;
 
-        // Create OPD users
-        foreach ($opdUsers as $userData) {
-            // Cek apakah user sudah ada
+        // Gabungkan semua user ke dalam satu array untuk looping yang lebih bersih
+        $allUsers = array_merge($adminUsers, $opdUsers, $pengusulUsers);
+
+        foreach ($allUsers as $userData) {
+            // Cek apakah user sudah ada berdasarkan username
             $existingUser = User::where('username', $userData['username'])->first();
 
             if (!$existingUser) {
@@ -158,31 +173,15 @@ class AdditionalUserSeeder extends Seeder
                     'status' => 'active'
                 ]));
                 $totalCreated++;
-                $this->command->info("Created OPD user: {$userData['username']}");
-            } else {
-                $this->command->warn("User {$userData['username']} already exists, skipping...");
-            }
-        }
-
-        // Create Pengusul users
-        foreach ($pengusulUsers as $userData) {
-            // Cek apakah user sudah ada
-            $existingUser = User::where('username', $userData['username'])->first();
-
-            if (!$existingUser) {
-                User::create(array_merge($userData, [
-                    'password' => Hash::make('password123'),
-                    'status' => 'active'
-                ]));
-                $totalCreated++;
-                $this->command->info("Created Pengusul user: {$userData['username']}");
+                $this->command->info("Created {$userData['peran']} user: {$userData['username']}");
             } else {
                 $this->command->warn("User {$userData['username']} already exists, skipping...");
             }
         }
 
         $this->command->info("======= ADDITIONAL USER SEEDER COMPLETED =======");
-        $this->command->info("Total users created: {$totalCreated}");
+        $this->command->info("Total new users created: {$totalCreated}");
+        $this->command->info("Admin Users: " . count($adminUsers));
         $this->command->info("OPD Users: " . count($opdUsers));
         $this->command->info("Pengusul Users: " . count($pengusulUsers));
         $this->command->info("================================================");
