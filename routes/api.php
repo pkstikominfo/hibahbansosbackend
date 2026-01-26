@@ -189,6 +189,11 @@ Route::middleware('auth:sanctum')->group(function () {
         'file-persyaratan',
         [FilePersyaratanController::class, 'store']
     );
+    Route::get(
+        'file-persyaratan/by-login-opd',
+        [FilePersyaratanController::class, 'getByLoginOpd']
+    );
+
     Route::put(
             'file-persyaratan/{id}',
             [FilePersyaratanController::class, 'update']
@@ -199,29 +204,29 @@ Route::middleware('auth:sanctum')->group(function () {
         );
     // Usulan Persyaratan Routes
 
-    Route::apiResource('usulan-persyaratan', UsulanPersyaratanController::class);
-    Route::get(
-        'usulan-persyaratan/getByIdUsulan/{id}',
-        [UsulanPersyaratanController::class, 'getByIdUsulan']
-    );
-    Route::get(
-        'usulan-persyaratan/{id}/download',
-        [UsulanPersyaratanController::class, 'download']
-    );
-
-    Route::apiResource('spj-persyaratan', SpjPersyaratanController::class);
-     Route::get(
-        'spj-persyaratan/getByIdSpj/{id}',
-        [SpjPersyaratanController::class, 'getByIdSpj']
-    );
-    Route::get(
-        'spj-persyaratan/{id}/download',
-        [SpjPersyaratanController::class, 'download']
-    );
-
-
 
 });
+
+// usulan persyaratan routes (public)
+Route::get(
+    'usulan-persyaratan/{id}/download',
+    [UsulanPersyaratanController::class, 'download']
+);
+Route::post(
+        'usulan-persyaratan',
+        [UsulanPersyaratanController::class, 'store']
+    );
+
+Route::put(
+'usulan-persyaratan/{id}',
+[UsulanPersyaratanController::class, 'update']
+);
+
+Route::delete(
+'usulan-persyaratan/{id}',
+[UsulanPersyaratanController::class, 'destroy']
+);
+// end usulan persyaratan routes
 
 // buat usulan baru (public)
 Route::post('usulan', [UsulanController::class, 'store']);
@@ -231,7 +236,12 @@ Route::post('usulan', [UsulanController::class, 'store']);
         'file-persyaratan',
         [FilePersyaratanController::class, 'index']
     );
+Route::get(
+    'file-persyaratan/by-opd',
+    [FilePersyaratanController::class, 'getByOpd']
+);
  Route::get(
         'file-persyaratan/{id}',
         [FilePersyaratanController::class, 'show']
     );
+

@@ -71,13 +71,6 @@ class SpjController
 
         $spj = $query->paginate($perPage, ['*'], 'page', $page);
 
-        // 🖼️ absolute URL untuk file
-        $spj->getCollection()->transform(function ($item) {
-            $item->file_persyaratan = $item->file_persyaratan
-                ? asset("storage/uploads/{$item->file_persyaratan}")
-                : null;
-            return $item;
-        });
 
         // 🖼️ absolute URL untuk file
         $spj->getCollection()->transform(function ($item) {
@@ -289,9 +282,6 @@ if ($search = trim($request->input('q'))) {
                 'foto'   => ['required', 'file', 'max:2048', 'mimes:jpg,jpeg,png'],
 
                 'realisasi'              => ['required', 'integer', 'min:0'],
-
-                // ✅ ENUM status
-                'status'             => ['required', Rule::in(['proses', 'selesai'])]
             ]);
 
 
@@ -392,7 +382,6 @@ if ($search = trim($request->input('q'))) {
                 'idusulan'  => ['sometimes', 'integer', 'exists:usulan,idusulan'],
                 'foto'      => ['sometimes', 'file', 'max:2048', 'mimes:jpg,jpeg,png'],
                 'realisasi' => ['sometimes', 'integer', 'min:0'],
-                'status'    => ['sometimes', Rule::in(['proses', 'selesai'])],
             ]);
 
             // upload foto
@@ -441,43 +430,6 @@ if ($search = trim($request->input('q'))) {
 
 
 
-   public function updateStatus(Request $request, string $id)
-    {
-        DB::beginTransaction();
-
-        try {
-            $spj = Spj::with('usulan')->findOrFail($id);
-
-            $validated = $request->validate([
-                'status' => ['required', Rule::in(['proses', 'selesai'])],
-            ]);
-
-            // cek kalau status sama, tidak kirim WA
-            if ($spj->status !== $validated['status']) {
-                $spj->update($validated);
-                log_bantuan(['id_fk' => $spj->idspj]);
-
-                $this->sendWaStatusSpj($spj);
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Status SPJ berhasil diperbarui',
-                'data'    => $spj->fresh('usulan'),
-            ], 200);
-
-        } catch (Throwable $e) {
-            DB::rollBack();
-            return response()->json([
-                'code'    => 'error',
-                'message' => 'Gagal memperbarui status SPJ',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-
     /**
      * Remove the specified resource from storage.
      */
@@ -485,10 +437,7 @@ if ($search = trim($request->input('q'))) {
     {
         try {
             $spj = Spj::findOrFail($id);
-            // hapus file dari storage jika ada
-            if ($spj->file_pertanggungjawaban && Storage::exists('public/uploads/' . $spj->file_pertanggungjawaban)) {
-                Storage::delete('public/uploads/' . $spj->file_pertanggungjawaban);
-            }
+
 
             if ($spj->foto && Storage::exists('public/uploads/' . $spj->foto)) {
                 Storage::delete('public/uploads/' . $spj->foto);

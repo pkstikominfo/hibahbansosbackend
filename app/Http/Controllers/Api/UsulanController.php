@@ -23,119 +23,81 @@ class UsulanController extends Controller
      * Display a listing of the resource with authorization filter
      */
     public function index(Request $request)
-    {
-        try {
-            // ✅ Authorization check
-            $this->authorize('viewAny', Usulan::class);
+{
+    try {
+        $this->authorize('viewAny', Usulan::class);
+        $user = $request->user();
 
-            $user = $request->user();
-            $query = Usulan::with(['subJenisBantuan', 'kategori', 'opd', 'desa']);
-
-            // ✅ Filter berdasarkan role
-            if ($user->isPengusul()) {
-                // Pengusul hanya lihat usulan sendiri
-                $query->where('email', $user->email);
-            } elseif ($user->isOpd()) {
-                // OPD lihat unassigned atau OPD sendiri
-                $query->where(function ($q) use ($user) {
-                    $q->whereNull('kode_opd')
-                        ->orWhere('kode_opd', $user->kode_opd);
-                });
-            }
-            // Admin lihat semua (no filter)
-
-            // 🔍 Search global
-            if ($search = $request->input('q')) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('judul', 'like', "%{$search}%")
-                        ->orWhere('idusulan', 'like', "%{$search}%")
-                        ->orWhere('anggaran_usulan', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('nohp', 'like', "%{$search}%")
-                        ->orWhere('anggaran_disetujui', 'like', "%{$search}%")
-                        ->orWhere('nama', 'like', "%{$search}%")
-                        ->orWhere('status', 'like', "%{$search}%")
-                        ->orWhere('tahun', 'like', "%{$search}%")
-                        ->orWhereHas('subJenisBantuan', fn($qq) => $qq->where('namasubjenis', 'like', "%{$search}%"))
-                        ->orWhereHas('kategori', fn($qq) => $qq->where('namakategori', 'like', "%{$search}%"))
-                        ->orWhereHas('opd', fn($qq) => $qq->where('nama_opd', 'like', "%{$search}%"))
-                        ->orWhereHas('desa', fn($qq) => $qq->where('namadesa', 'like', "%{$search}%"));
-                });
-            }
-
-            // 🔽 Sorting
-            $sortBy  = $request->input('sort_by', 'idusulan');
-            $sortDir = $request->input('sort_dir', 'asc');
-
-            $directSorts = [
-                'idusulan',
-                'judul',
-                'anggaran_usulan',
-                'anggaran_disetujui',
-                'email',
-                'nohp',
-                'status',
-                'nama',
-                'tahun',
-            ];
-
-            $relationSorts = [
-                'subjenis' => ['table' => 'sub_jenis_bantuan', 'column' => 'namasubjenis', 'local_key' => 'idsubjenisbantuan', 'foreign_key' => 'idsubjenisbantuan'],
-                'kategori' => ['table' => 'kategori',           'column' => 'namakategori',  'local_key' => 'idkategori',        'foreign_key' => 'idkategori'],
-                'opd'      => ['table' => 'opd',                'column' => 'nama_opd',      'local_key' => 'kode_opd',          'foreign_key' => 'kode_opd'],
-                'desa'     => ['table' => 'desa',               'column' => 'namadesa',      'local_key' => 'iddesa',            'foreign_key' => 'iddesa'],
-            ];
-
-            if (in_array($sortBy, $directSorts)) {
-                $query->orderBy("usulan.$sortBy", $sortDir);
-            } elseif (array_key_exists($sortBy, $relationSorts)) {
-                [$table, $column, $local, $foreign] = [
-                    $relationSorts[$sortBy]['table'],
-                    $relationSorts[$sortBy]['column'],
-                    $relationSorts[$sortBy]['local_key'],
-                    $relationSorts[$sortBy]['foreign_key'],
-                ];
-
-                $query->leftJoin($table, "usulan.$local", '=', "$table.$foreign")
-                    ->orderBy("$table.$column", $sortDir)
-                    ->select('usulan.*');
-            } else {
-                $query->orderBy('usulan.idusulan', 'asc');
-            }
-
-            // 🔄 Pagination
-            $perPage = (int) $request->input('per_page', 10);
-            $page    = (int) $request->input('page', 1);
-
-            $usulan = $query->paginate($perPage, ['*'], 'page', $page);
-
-
-            return response()->json([
-                'code' => 'success',
-                'data' => $usulan->items(),
-                'meta' => [
-                    'page'        => $usulan->currentPage(),
-                    'per_page'    => $usulan->perPage(),
-                    'total'       => $usulan->total(),
-                    'total_pages' => $usulan->lastPage(),
-                    'sort_by'     => $sortBy,
-                    'sort_dir'    => $sortDir,
-                    'search'      => $search ?? null,
-                ],
+        $query = Usulan::query()
+            ->leftJoin('kategori', 'usulan.idkategori', '=', 'kategori.idkategori')
+            ->leftJoin('sub_jenis_bantuan', 'usulan.idsubjenisbantuan', '=', 'sub_jenis_bantuan.idsubjenisbantuan')
+            ->with('usulanPersyaratan')
+            ->select([
+                'usulan.*',
+                'kategori.namakategori as nama_kategori',
+                'sub_jenis_bantuan.namasubjenis as nama_subjenis',
             ]);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return response()->json([
-                'code'    => 'error',
-                'message' => 'Unauthorized: ' . $e->getMessage(),
-            ], 403);
-        } catch (Throwable $e) {
-            return response()->json([
-                'code'    => 'error',
-                'message' => 'Gagal mengambil data usulan',
-                'error'   => $e->getMessage(),
-            ], 500);
+
+        // 🔐 Role Filter
+        if ($user->isPengusul()) {
+            $query->where('usulan.email', $user->email);
+        } elseif ($user->isOpd()) {
+            $query->where(function ($q) use ($user) {
+                $q->whereNull('usulan.kode_opd')
+                  ->orWhere('usulan.kode_opd', $user->kode_opd);
+            });
         }
+
+        // 🔍 Search
+        if ($search = $request->q) {
+            $query->where(function ($q) use ($search) {
+                $q->where('usulan.judul', 'like', "%$search%")
+                  ->orWhere('kategori.namakategori', 'like', "%$search%")
+                  ->orWhere('sub_jenis_bantuan.namasubjenis', 'like', "%$search%");
+            });
+        }
+
+        // 🔽 Sorting
+        $sortBy  = $request->input('sort_by', 'idusulan');
+        $sortDir = $request->input('sort_dir', 'asc');
+
+        $query->orderBy($sortBy, $sortDir);
+
+        // 🔄 Pagination
+        $usulan = $query->paginate(
+            (int) $request->input('per_page', 10)
+        );
+
+        // 🔗 UBAH file_persyaratan → LINK
+        $usulan->getCollection()->transform(function ($item) {
+            $item->usulanPersyaratan->transform(function ($p) {
+                $p->file_persyaratan = $p->file_persyaratan
+                    ? asset('uploads/' . $p->file_persyaratan)
+                    : null;
+                return $p;
+            });
+            return $item;
+        });
+
+        return response()->json([
+            'code' => 'success',
+            'data' => $usulan->items(),
+            'meta' => [
+                'page' => $usulan->currentPage(),
+                'total' => $usulan->total()
+            ]
+        ]);
+
+    } catch (Throwable $e) {
+        return response()->json([
+            'code' => 'error',
+            'message' => 'Gagal mengambil data',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
+
 
     /**
      * Store a newly created resource in storage.
@@ -259,81 +221,46 @@ class UsulanController extends Controller
      */
    public function update(Request $request, string $id)
     {
-        DB::beginTransaction();
-
         try {
             $usulan = Usulan::findOrFail($id);
 
-            // Authorization
+            // 🔐 Authorization
             $this->authorize('update', $usulan);
 
-            // Simpan status lama
-            $oldStatus = $usulan->status;
-
-            // Validasi
+            /**
+             * =================================================
+             * VALIDASI: JANGAN TERIMA FIELD TERLARANG
+             * =================================================
+             */
             $validated = $request->validate([
-                'judul'              => ['sometimes', 'string', 'max:255'],
+                'judul'              => ['sometimes', 'string'],
                 'anggaran_usulan'    => ['sometimes', 'integer', 'min:0'],
                 'anggaran_disetujui' => ['sometimes', 'integer', 'min:0'],
-                'email'              => ['sometimes', 'email', 'max:50'],
-                'nohp'               => ['sometimes', 'string', 'max:15'],
-                'nama'               => ['sometimes', 'string', 'max:100'],
-                'status'             => ['sometimes', Rule::in(['diusulkan', 'disetujui', 'diterima', 'ditolak'])],
-                'idsubjenisbantuan'  => ['sometimes', 'integer', 'exists:sub_jenis_bantuan,idsubjenisbantuan'],
-                'idkategori'         => ['sometimes', 'integer', 'exists:kategori,idkategori'],
-                'iddesa'             => ['sometimes', 'integer', 'exists:desa,iddesa'],
-                'kode_opd'           => ['sometimes', 'string', 'exists:opd,kode_opd'],
+                'status'             => ['sometimes', 'in:diusulkan,disetujui,diterima,ditolak'],
                 'catatan_ditolak'    => ['sometimes', 'string', 'max:500'],
                 'tahun'              => ['sometimes', 'digits:4'],
             ]);
 
-            // Update data
-            $usulan->update($validated);
-            log_bantuan(['id_fk' => $usulan->idusulan]);
+            // 🚫 Jika request mencoba kirim field terlarang
+            $forbiddenFields = [
+                'iddesa',
+                'email',
+                'nohp',
+                'idsubjenisbantuan',
+                'idkategori',
+                'nama',
+            ];
 
-            // ===============================
-            // 🔔 KIRIM WHATSAPP JIKA STATUS BERUBAH
-            // ===============================
-            if (
-                array_key_exists('status', $validated) &&
-                $oldStatus !== $validated['status']
-            ) {
-                $no_hp = $usulan->nohp;
-
-                if ($no_hp) {
-                    $cek_valid_wa = json_decode(
-                        validate_whatsapp(getTokenFonte(), $no_hp)
-                    );
-
-                    if ($cek_valid_wa && $cek_valid_wa->status) {
-                        if (empty($cek_valid_wa->not_registered)) {
-
-                            $pesan = match ($usulan->status) {
-                                'disetujui' =>
-                                    "✅ *Usulan Disetujui*\n\nJudul: {$usulan->judul}",
-
-                                'diterima' =>
-                                    "🎉 *Usulan Diterima*\n\nJudul: {$usulan->judul}",
-
-                                'ditolak' =>
-                                    "❌ *Usulan Ditolak*\n\nCatatan:\n{$usulan->catatan_ditolak}",
-
-                                default =>
-                                    "📌 Status usulan diperbarui menjadi *{$usulan->status}*",
-                            };
-
-                            // Kirim WA
-                            send_whatsapp(
-                                getTokenFonte(),
-                                $no_hp,
-                                $pesan
-                            );
-                        }
-                    }
+            foreach ($forbiddenFields as $field) {
+                if ($request->has($field)) {
+                    return response()->json([
+                        'code' => 'error',
+                        'message' => "Field {$field} tidak boleh diubah",
+                    ], 403);
                 }
             }
 
-            DB::commit();
+            $usulan->update($validated);
 
             return response()->json([
                 'code'    => 'success',
@@ -341,29 +268,28 @@ class UsulanController extends Controller
                 'data'    => $usulan->fresh(),
             ], 200);
 
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            DB::rollBack();
-            return response()->json([
-                'code'    => 'error',
-                'message' => 'Unauthorized',
-            ], 403);
-
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            DB::rollBack();
             return response()->json([
-                'code'    => 'error',
+                'code' => 'error',
                 'message' => 'Usulan tidak ditemukan',
             ], 404);
 
-        } catch (Throwable $e) {
-            DB::rollBack();
+        } catch (\Exception $e) {
+            // Exception dari model (field terlarang)
             return response()->json([
-                'code'    => 'error',
+                'code' => 'error',
+                'message' => $e->getMessage(),
+            ], 403);
+
+        } catch (Throwable $e) {
+            return response()->json([
+                'code' => 'error',
                 'message' => 'Gagal memperbarui usulan',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
+
 
     public function updateStatus(Request $request, string $id)
     {

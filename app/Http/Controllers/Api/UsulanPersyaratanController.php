@@ -1,39 +1,16 @@
 <?php
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\UsulanPersyaratan;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
 
 class UsulanPersyaratanController extends Controller
 {
     /**
-     * GET: tampilkan semua data
-     */
-    public function index()
-    {
-        try {
-            $data = UsulanPersyaratan::with(['usulan', 'filePersyaratan'])->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * POST: simpan data + upload file
+     * STORE
      */
     public function store(Request $request)
     {
@@ -41,20 +18,22 @@ class UsulanPersyaratanController extends Controller
             $validator = Validator::make($request->all(), [
                 'idusulan' => 'required|exists:usulan,idusulan',
                 'id_fp' => 'required|exists:file_persyaratan,id_fp',
-                'file_persyaratan' => 'required|file|mimes:pdf,jpg,jpeg,png|max:2048',
+                'file_persyaratan' => 'required|file|mimes:pdf|max:2048',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            $file = $request->file('file_persyaratan');
-            $filename = time() . '_' . $file->getClientOriginalName();
-            $file->storeAs('uploads', $filename);
+            // 🔐 NAMA FILE AMAN
+            $filename = time() . '.' . $request->file('file_persyaratan')->getClientOriginalExtension();
+
+            // ⬆️ SIMPAN KE public/uploads
+            $request->file('file_persyaratan')
+                ->move(public_path('uploads'), $filename);
 
             $data = UsulanPersyaratan::create([
                 'idusulan' => $request->idusulan,
@@ -64,136 +43,77 @@ class UsulanPersyaratanController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data dan file berhasil disimpan',
-                'data' => $data
+                'data' => $data,
+                'file_url' => asset('uploads/' . $filename)
             ], 201);
 
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat menyimpan data',
+                'message' => 'Gagal menyimpan data',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * GET: detail data
-     */
-    public function getByIdUsulan($id)
-    {
-        try {
-            $data = UsulanPersyaratan::with(['usulan', 'filePersyaratan'])->where('idusulan', $id)->get();
-
-            $data->transform(function ($item) {
-                $item->file_url = asset('storage/uploads/' . $item->file_persyaratan);
-                return $item;
-            });
-
-            return response()->json([
-                'success' => true,
-                'data' => $data,
-            ]);
-        } catch (Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data tidak ditemukan',
-                'error' => $e->getMessage()
-            ], 404);
-        }
-    }
-
-    public function show($id)
-    {
-        try {
-            $data = UsulanPersyaratan::with(['usulan', 'filePersyaratan'])
-                ->findOrFail($id);
-
-            return response()->json([
-                'success' => true,
-                'data' => $data,
-                'file_url' => asset('storage/uploads/' . $data->file_persyaratan)
-            ]);
-        } catch (Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data tidak ditemukan',
-                'error' => $e->getMessage()
-            ], 404);
-        }
-    }
-
-    /**
-     * PUT/PATCH: update data + optional upload file
+     * UPDATE FILE SAJA
      */
     public function update(Request $request, $id)
     {
         try {
             $data = UsulanPersyaratan::findOrFail($id);
 
-            $validator = Validator::make($request->all(), [
-                'idusulan' => 'required|exists:usulan,idusulan',
-                'id_fp' => 'required|exists:file_persyaratan,id_fp',
-                'file_persyaratan' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+            $request->validate([
+                'file_persyaratan' => 'required|file|mimes:pdf|max:2048',
             ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
+            // 🧹 HAPUS FILE LAMA
+            if ($data->file_persyaratan && file_exists(public_path('uploads/' . $data->file_persyaratan))) {
+                unlink(public_path('uploads/' . $data->file_persyaratan));
             }
 
-            if ($request->hasFile('file_persyaratan')) {
+            // 🔐 FILE BARU
+            $filename = time() . '.' . $request->file('file_persyaratan')->getClientOriginalExtension();
 
-                if ($data->file_persyaratan && Storage::exists('uploads/' . $data->file_persyaratan)) {
-                    Storage::delete('uploads/' . $data->file_persyaratan);
-                }
+            $request->file('file_persyaratan')
+                ->move(public_path('uploads'), $filename);
 
-                $file = $request->file('file_persyaratan');
-                $filename = time() . '_' . $file->getClientOriginalName();
-                $file->storeAs('uploads', $filename);
-
-                $data->file_persyaratan = $filename;
-            }
-
-            $data->idusulan = $request->idusulan;
-            $data->id_fp = $request->id_fp;
-            $data->save();
+            $data->update([
+                'file_persyaratan' => $filename
+            ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data berhasil diupdate',
-                'data' => $data
+                'file_url' => asset('uploads/' . $filename),
             ]);
 
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat update data',
+                'message' => 'Gagal update file',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * DELETE: hapus data + file
+     * DELETE
      */
     public function destroy($id)
     {
         try {
             $data = UsulanPersyaratan::findOrFail($id);
 
-            if ($data->file_persyaratan && Storage::exists('uploads/' . $data->file_persyaratan)) {
-                Storage::delete('uploads/' . $data->file_persyaratan);
+            if ($data->file_persyaratan && file_exists(public_path('uploads/' . $data->file_persyaratan))) {
+                unlink(public_path('uploads/' . $data->file_persyaratan));
             }
 
             $data->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Data dan file berhasil dihapus'
+                'message' => 'Data & file berhasil dihapus'
             ]);
 
         } catch (Throwable $e) {
@@ -206,29 +126,20 @@ class UsulanPersyaratanController extends Controller
     }
 
     /**
-     * DOWNLOAD FILE
+     * DOWNLOAD (AMAN)
      */
     public function download($id)
     {
-        try {
-            $data = UsulanPersyaratan::findOrFail($id);
-            $path = 'uploads/' . $data->file_persyaratan;
+        $data = UsulanPersyaratan::findOrFail($id);
+        $path = public_path('uploads/' . $data->file_persyaratan);
 
-            if (!Storage::exists($path)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'File tidak ditemukan'
-                ], 404);
-            }
-
-            return Storage::download($path);
-
-        } catch (Throwable $e) {
+        if (!file_exists($path)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mendownload file',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'File tidak ditemukan'
+            ], 404);
         }
+
+        return response()->download($path);
     }
 }
