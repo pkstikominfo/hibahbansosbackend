@@ -27,6 +27,9 @@ use App\Http\Controllers\Api\TokenController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+});
 
 
 Route::prefix('kecamatan')->group(function () {
@@ -53,6 +56,10 @@ Route::get('/opd-search', [OpdController::class, 'search']);
 Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
 Route::get('/opd-paginated', [OpdController::class, 'paginated']);
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/opd-me', [OpdController::class, 'me']);
+});
+
 
 
 
@@ -72,79 +79,88 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::put('/user/change-password', [AuthController::class, 'changePassword']);
 
-   Route::prefix('sub-jenis-bantuan')->group(function () {
+    Route::prefix('sub-jenis-bantuan')->group(function () {
 
-    Route::get('/',
-        [SubJenisBantuanController::class, 'index']
-    );
-
-    // by ID sub jenis bantuan
-    Route::get('/detail/{id_subjenisbantuan}',
-        [SubJenisBantuanController::class, 'show']
-    );
-
-    // by jenis bantuan
-    Route::get('/jenis/{id_jenisbantuan}',
-        [SubJenisBantuanController::class, 'getByJenisBantuan']
-    );
-
-    // by kategori
-    Route::get('/kategori/{id_kategori}',
-        [SubJenisBantuanController::class, 'getByKategori']
-    );
-
-});
-   Route::prefix('sub-jenis-bantuan')->group(function () {
-        Route::get('/',
+        Route::get(
+            '/',
             [SubJenisBantuanController::class, 'index']
         );
 
         // by ID sub jenis bantuan
-        Route::get('/detail/{id_subjenisbantuan}',
+        Route::get(
+            '/detail/{id_subjenisbantuan}',
             [SubJenisBantuanController::class, 'show']
         );
 
         // by jenis bantuan
-        Route::get('/jenis/{id_jenisbantuan}',
+        Route::get(
+            '/jenis/{id_jenisbantuan}',
             [SubJenisBantuanController::class, 'getByJenisBantuan']
         );
 
         // by kategori
-        Route::get('/kategori/{id_kategori}',
+        Route::get(
+            '/kategori/{id_kategori}',
             [SubJenisBantuanController::class, 'getByKategori']
         );
+    });
+    Route::prefix('sub-jenis-bantuan')->group(function () {
+        Route::get(
+            '/',
+            [SubJenisBantuanController::class, 'index']
+        );
 
+        // by ID sub jenis bantuan
+        Route::get(
+            '/detail/{id_subjenisbantuan}',
+            [SubJenisBantuanController::class, 'show']
+        );
+
+        // by jenis bantuan
+        Route::get(
+            '/jenis/{id_jenisbantuan}',
+            [SubJenisBantuanController::class, 'getByJenisBantuan']
+        );
+
+        // by kategori
+        Route::get(
+            '/kategori/{id_kategori}',
+            [SubJenisBantuanController::class, 'getByKategori']
+        );
     });
 
     Route::prefix('kategori')->group(function () {
 
-        Route::get('/',
+        Route::get(
+            '/',
             [KategoriController::class, 'index']
         );
 
         // by ID sub jenis bantuan
-        Route::get('/detail/{id_kategori}',
+        Route::get(
+            '/detail/{id_kategori}',
             [KategoriController::class, 'show']
         );
 
         // by jenis bantuan
-        Route::get('/jenis/{id_jenisbantuan}',
+        Route::get(
+            '/jenis/{id_jenisbantuan}',
             [KategoriController::class, 'getByJenisBantuan']
         );
-
     });
 
     Route::prefix('jenis-bantuan')->group(function () {
 
-        Route::get('/',
+        Route::get(
+            '/',
             [JenisBantuanController::class, 'index']
         );
 
         // by ID sub jenis bantuan
-        Route::get('/detail/{id_jenisbantuan}',
+        Route::get(
+            '/detail/{id_jenisbantuan}',
             [JenisBantuanController::class, 'show']
         );
-
     });
 
 
@@ -190,13 +206,13 @@ Route::middleware('auth:sanctum')->group(function () {
         [FilePersyaratanController::class, 'store']
     );
     Route::put(
-            'file-persyaratan/{id}',
-            [FilePersyaratanController::class, 'update']
-        );
+        'file-persyaratan/{id}',
+        [FilePersyaratanController::class, 'update']
+    );
     Route::delete(
-            'file-persyaratan/{id}',
-            [FilePersyaratanController::class, 'destroy']
-        );
+        'file-persyaratan/{id}',
+        [FilePersyaratanController::class, 'destroy']
+    );
     // Usulan Persyaratan Routes
 
     Route::apiResource('usulan-persyaratan', UsulanPersyaratanController::class);
@@ -210,7 +226,7 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
     Route::apiResource('spj-persyaratan', SpjPersyaratanController::class);
-     Route::get(
+    Route::get(
         'spj-persyaratan/getByIdSpj/{id}',
         [SpjPersyaratanController::class, 'getByIdSpj']
     );
@@ -218,20 +234,17 @@ Route::middleware('auth:sanctum')->group(function () {
         'spj-persyaratan/{id}/download',
         [SpjPersyaratanController::class, 'download']
     );
-
-
-
 });
 
 // buat usulan baru (public)
 Route::post('usulan', [UsulanController::class, 'store']);
 
 // Public File Persyaratan Routes
- Route::get(
-        'file-persyaratan',
-        [FilePersyaratanController::class, 'index']
-    );
- Route::get(
-        'file-persyaratan/{id}',
-        [FilePersyaratanController::class, 'show']
-    );
+Route::get(
+    'file-persyaratan',
+    [FilePersyaratanController::class, 'index']
+);
+Route::get(
+    'file-persyaratan/{id}',
+    [FilePersyaratanController::class, 'show']
+);

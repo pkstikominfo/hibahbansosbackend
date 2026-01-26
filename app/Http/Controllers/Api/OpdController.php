@@ -7,9 +7,11 @@ use App\Models\Opd;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class OpdController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */
@@ -117,6 +119,8 @@ class OpdController extends Controller
                 ], 404);
             }
 
+            $this->authorize('update', $opd);
+
             $validator = Validator::make($request->all(), [
                 'kode_opd' => 'sometimes|required|string|max:10|unique:opd,kode_opd,' . $id . ',kode_opd',
                 'nama_opd' => 'sometimes|required|string|max:255'
@@ -143,6 +147,12 @@ class OpdController extends Controller
                 'message' => 'OPD berhasil diperbarui',
                 'data' => $opd
             ], 200);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            // Custom error message jika user nekat edit punya orang lain
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: Anda hanya boleh mengedit data OPD Anda sendiri.'
+            ], 403);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -277,5 +287,37 @@ class OpdController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function me(Request $request)
+    {
+        // 1. Ambil user yang sedang login
+        $user = $request->user();
+
+        // 2. Cek apakah user memiliki kode_opd
+        // (Bisa juga ditambahkan pengecekan role jika ingin strict: $user->peran !== 'opd')
+        if (!$user->kode_opd) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User ini tidak terhubung dengan data OPD manapun.',
+            ], 404);
+        }
+
+        // 3. Cari data OPD berdasarkan kode_opd milik user
+        $opd = Opd::where('kode_opd', $user->kode_opd)->first();
+
+        if (!$opd) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data OPD tidak ditemukan.',
+            ], 404);
+        }
+
+        // 4. Return data
+        return response()->json([
+            'success' => true,
+            'message' => 'Data OPD user yang sedang login berhasil diambil',
+            'data'    => $opd
+        ], 200);
     }
 }
