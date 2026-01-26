@@ -16,8 +16,6 @@ return new class extends Migration
             $table->integer('idusulan')->nullable();
             $table->string('foto', 100);
             $table->integer('realisasi');
-            $table->enum('status', ['proses', 'selesai'])->nullable();
-
 
              // 🔗 Relasi
             $table->foreign('idusulan')->references('idusulan')->on('usulan');

@@ -19,7 +19,6 @@ class Spj extends Model
         'idusulan',
         'foto',
         'realisasi',
-        'status',
         'created_by',
         'updated_by',
     ];
@@ -39,15 +38,6 @@ class Spj extends Model
     }
 
     // Scope untuk status
-    public function scopeDiusulkan($query)
-    {
-        return $query->where('status', 'diusulkan');
-    }
-
-    public function scopeDisetujui($query)
-    {
-        return $query->where('status', 'disetujui');
-    }
 
      public function creator()
     {
