@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\SpjPersyaratanController;
 use App\Http\Controllers\Api\SubJenisBantuanController;
 use App\Http\Controllers\Api\JenisBantuanController;
 use App\Http\Controllers\Api\KategoriController;
+use App\Http\Controllers\Api\OtpController;
 
 
 use App\Http\Controllers\Api\TokenController;
@@ -169,7 +170,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('spj', SpjController::class);
 
     Route::middleware('role:admin')->group(function () {
-        Route::apiResource('users', UserController::class);
+        Route::apiResource('uss', UserController::class);
         Route::get('/users-search', [UserController::class, 'search']);
         Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
         Route::get('/users-paginated', [UserController::class, 'paginated']);
@@ -190,11 +191,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('usulan')->group(function () {
-        Route::get('/', [UsulanController::class, 'index']);
-        Route::get('/{id}', [UsulanController::class, 'show']);
-        Route::put('/{id}', [UsulanController::class, 'update']);
+
         Route::put('/{id}/status', [UsulanController::class, 'updateStatus']);
-        Route::delete('/{id}', action: [UsulanController::class, 'destroy']);
         Route::post('/{id}/approve', [UsulanController::class, 'approve']);
         Route::get('/logs/all', [UsulanController::class, 'getLogs']);
         Route::get('/getByOpd/{kode_opd}', [UsulanController::class, 'getByOpd']);
@@ -220,30 +218,9 @@ Route::middleware('auth:sanctum')->group(function () {
     );
     // Usulan Persyaratan Routes
 
-<<<<<<< HEAD
-    Route::apiResource('usulan-persyaratan', UsulanPersyaratanController::class);
-    Route::get(
-        'usulan-persyaratan/getByIdUsulan/{id}',
-        [UsulanPersyaratanController::class, 'getByIdUsulan']
-    );
-    Route::get(
-        'usulan-persyaratan/{id}/download',
-        [UsulanPersyaratanController::class, 'download']
-    );
-
-    Route::apiResource('spj-persyaratan', SpjPersyaratanController::class);
-    Route::get(
-        'spj-persyaratan/getByIdSpj/{id}',
-        [SpjPersyaratanController::class, 'getByIdSpj']
-    );
-    Route::get(
-        'spj-persyaratan/{id}/download',
-        [SpjPersyaratanController::class, 'download']
-    );
-=======
-
->>>>>>> 3f71f8f7a5799fce9f8356325fdfcf1ae5627d15
 });
+
+Route::post('/otp/send', [OtpController::class, 'send']);
 
 // usulan persyaratan routes (public)
 Route::get(
@@ -268,18 +245,14 @@ Route::delete(
 
 // buat usulan baru (public)
 Route::post('usulan', [UsulanController::class, 'store']);
+Route::put('usulan/{id}', [UsulanController::class, 'update']);
+Route::delete('usulan/{id}', action: [UsulanController::class, 'destroy']);
+Route::get('usulan/', [UsulanController::class, 'index']);
+Route::get('usulan/{id}', [UsulanController::class, 'show']);
+Route::get('/u/{hash}', [UsulanController::class, 'showByHash']);
+
 
 // Public File Persyaratan Routes
-<<<<<<< HEAD
-Route::get(
-    'file-persyaratan',
-    [FilePersyaratanController::class, 'index']
-);
-Route::get(
-    'file-persyaratan/{id}',
-    [FilePersyaratanController::class, 'show']
-);
-=======
  Route::get(
         'file-persyaratan',
         [FilePersyaratanController::class, 'index']
@@ -293,4 +266,3 @@ Route::get(
         [FilePersyaratanController::class, 'show']
     );
 
->>>>>>> 3f71f8f7a5799fce9f8356325fdfcf1ae5627d15

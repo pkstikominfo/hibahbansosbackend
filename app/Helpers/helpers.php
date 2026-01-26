@@ -90,3 +90,15 @@ if (!function_exists('send_whatsapp')) {
     }
 }
 
+if (!function_exists('generateKode')) {
+   function generateKode($length = 6)
+    {
+        $result = '';
+        for ($i = 0; $i < $length; $i++) {
+            $result .= mt_rand(0, 9);
+        }
+        return $result;
+    }
+}
+
+

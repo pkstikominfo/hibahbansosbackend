@@ -16,12 +16,10 @@ class Usulan extends Model
 
     /**
      * =====================================================
-     * FIELD YANG BOLEH MASS ASSIGNMENT (CREATE SAJA)
+     * FIELD YANG BOLEH DI-MASS ASSIGN (CREATE)
      * =====================================================
-     * Field sensitif TIDAK DIMASUKKAN
      */
     protected $fillable = [
-        // field lain yang memang boleh diupdate
         'judul',
         'anggaran_usulan',
         'anggaran_disetujui',
@@ -29,6 +27,14 @@ class Usulan extends Model
         'catatan_ditolak',
         'tahun',
         'kode_opd',
+
+        // 🔑 FIELD WAJIB CREATE
+        'email',
+        'nohp',
+        'nama',
+        'iddesa',
+        'idsubjenisbantuan',
+        'idkategori',
     ];
 
     /**
@@ -49,9 +55,7 @@ class Usulan extends Model
                 'nama',
             ];
 
-            $dirty = array_keys($usulan->getDirty());
-
-            foreach ($dirty as $field) {
+            foreach (array_keys($usulan->getDirty()) as $field) {
                 if (in_array($field, $forbiddenFields, true)) {
                     throw new \Exception(
                         "Field {$field} tidak boleh diubah"
@@ -60,6 +64,8 @@ class Usulan extends Model
             }
         });
     }
+
+
 
     /* ===================== RELATIONS ===================== */
 
@@ -95,6 +101,15 @@ class Usulan extends Model
             Opd::class,
             'kode_opd',
             'kode_opd'
+        );
+    }
+
+    public function spj()
+    {
+        return $this->hasOne(
+            Spj::class,
+            'idusulan',   // FK di tabel spj
+            'idusulan'    // PK di tabel usulan
         );
     }
 }
