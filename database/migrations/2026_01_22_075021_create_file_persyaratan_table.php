@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('file_persyaratan', function (Blueprint $table) {
             $table->integer('id_fp', true);
             $table->char('id_opd', 10);
-            $table->char('nama_persayaratan', length: 100);
+            $table->char('nama_persyaratan', length: 100);
             $table->tinyInteger('idsubjenisbantuan');
 
             $table->foreign('id_opd')->references('kode_opd')->on('opd');

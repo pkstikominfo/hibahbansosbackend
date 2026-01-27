@@ -17,7 +17,7 @@ class FilePersyaratan extends Model
 
     protected $fillable = [
         'id_opd',
-        'nama_persayaratan',
+        'nama_persyaratan',
         'idsubjenisbantuan',
     ];
 
