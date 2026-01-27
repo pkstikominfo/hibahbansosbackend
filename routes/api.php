@@ -79,91 +79,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::put('/user/change-password', [AuthController::class, 'changePassword']);
 
-    Route::prefix('sub-jenis-bantuan')->group(function () {
-
-        Route::get(
-            '/',
-            [SubJenisBantuanController::class, 'index']
-        );
-
-        // by ID sub jenis bantuan
-        Route::get(
-            '/detail/{id_subjenisbantuan}',
-            [SubJenisBantuanController::class, 'show']
-        );
-
-        // by jenis bantuan
-        Route::get(
-            '/jenis/{id_jenisbantuan}',
-            [SubJenisBantuanController::class, 'getByJenisBantuan']
-        );
-
-        // by kategori
-        Route::get(
-            '/kategori/{id_kategori}',
-            [SubJenisBantuanController::class, 'getByKategori']
-        );
-    });
-    Route::prefix('sub-jenis-bantuan')->group(function () {
-        Route::get(
-            '/',
-            [SubJenisBantuanController::class, 'index']
-        );
-
-        // by ID sub jenis bantuan
-        Route::get(
-            '/detail/{id_subjenisbantuan}',
-            [SubJenisBantuanController::class, 'show']
-        );
-
-        // by jenis bantuan
-        Route::get(
-            '/jenis/{id_jenisbantuan}',
-            [SubJenisBantuanController::class, 'getByJenisBantuan']
-        );
-
-        // by kategori
-        Route::get(
-            '/kategori/{id_kategori}',
-            [SubJenisBantuanController::class, 'getByKategori']
-        );
-    });
-
-    Route::prefix('kategori')->group(function () {
-
-        Route::get(
-            '/',
-            [KategoriController::class, 'index']
-        );
-
-        // by ID sub jenis bantuan
-        Route::get(
-            '/detail/{id_kategori}',
-            [KategoriController::class, 'show']
-        );
-
-        // by jenis bantuan
-        Route::get(
-            '/jenis/{id_jenisbantuan}',
-            [KategoriController::class, 'getByJenisBantuan']
-        );
-    });
-
-    Route::prefix('jenis-bantuan')->group(function () {
-
-        Route::get(
-            '/',
-            [JenisBantuanController::class, 'index']
-        );
-
-        // by ID sub jenis bantuan
-        Route::get(
-            '/detail/{id_jenisbantuan}',
-            [JenisBantuanController::class, 'show']
-        );
-    });
-
-
     Route::apiResource('token', TokenController::class);
 
     Route::apiResource('spj', SpjController::class);
@@ -220,29 +135,54 @@ Route::middleware('auth:sanctum')->group(function () {
     );
     // Usulan Persyaratan Routes
 
-<<<<<<< HEAD
-    Route::apiResource('usulan-persyaratan', UsulanPersyaratanController::class);
+});
+
+Route::prefix('sub-jenis-bantuan')->group(function () {
+
+    Route::get('/', [SubJenisBantuanController::class, 'index']);
+    // by ID sub jenis bantuan
+    Route::get('/detail/{id_subjenisbantuan}', [SubJenisBantuanController::class, 'show']);
+
+    // by jenis bantuan
+    Route::get('/jenis/{id_jenisbantuan}', [SubJenisBantuanController::class, 'getByJenisBantuan']);
+
+    // by kategori
+    Route::get('/kategori/{id_kategori}', [SubJenisBantuanController::class, 'getByKategori']);
+});
+
+
+Route::prefix('kategori')->group(function () {
+
     Route::get(
-        'usulan-persyaratan/getByIdUsulan/{id}',
-        [UsulanPersyaratanController::class, 'getByIdUsulan']
-    );
-    Route::get(
-        'usulan-persyaratan/{id}/download',
-        [UsulanPersyaratanController::class, 'download']
+        '/',
+        [KategoriController::class, 'index']
     );
 
-    Route::apiResource('spj-persyaratan', SpjPersyaratanController::class);
+    // by ID sub jenis bantuan
     Route::get(
-        'spj-persyaratan/getByIdSpj/{id}',
-        [SpjPersyaratanController::class, 'getByIdSpj']
+        '/detail/{id_kategori}',
+        [KategoriController::class, 'show']
     );
-    Route::get(
-        'spj-persyaratan/{id}/download',
-        [SpjPersyaratanController::class, 'download']
-    );
-=======
 
->>>>>>> 3f71f8f7a5799fce9f8356325fdfcf1ae5627d15
+    // by jenis bantuan
+    Route::get(
+        '/jenis/{id_jenisbantuan}',
+        [KategoriController::class, 'getByJenisBantuan']
+    );
+});
+
+Route::prefix('jenis-bantuan')->group(function () {
+
+    Route::get(
+        '/',
+        [JenisBantuanController::class, 'index']
+    );
+
+    // by ID sub jenis bantuan
+    Route::get(
+        '/detail/{id_jenisbantuan}',
+        [JenisBantuanController::class, 'show']
+    );
 });
 
 // usulan persyaratan routes (public)
@@ -251,18 +191,18 @@ Route::get(
     [UsulanPersyaratanController::class, 'download']
 );
 Route::post(
-        'usulan-persyaratan',
-        [UsulanPersyaratanController::class, 'store']
-    );
+    'usulan-persyaratan',
+    [UsulanPersyaratanController::class, 'store']
+);
 
 Route::put(
-'usulan-persyaratan/{id}',
-[UsulanPersyaratanController::class, 'update']
+    'usulan-persyaratan/{id}',
+    [UsulanPersyaratanController::class, 'update']
 );
 
 Route::delete(
-'usulan-persyaratan/{id}',
-[UsulanPersyaratanController::class, 'destroy']
+    'usulan-persyaratan/{id}',
+    [UsulanPersyaratanController::class, 'destroy']
 );
 // end usulan persyaratan routes
 
@@ -270,27 +210,15 @@ Route::delete(
 Route::post('usulan', [UsulanController::class, 'store']);
 
 // Public File Persyaratan Routes
-<<<<<<< HEAD
 Route::get(
     'file-persyaratan',
     [FilePersyaratanController::class, 'index']
 );
 Route::get(
-    'file-persyaratan/{id}',
-    [FilePersyaratanController::class, 'show']
-);
-=======
- Route::get(
-        'file-persyaratan',
-        [FilePersyaratanController::class, 'index']
-    );
-Route::get(
     'file-persyaratan/by-opd',
     [FilePersyaratanController::class, 'getByOpd']
 );
- Route::get(
-        'file-persyaratan/{id}',
-        [FilePersyaratanController::class, 'show']
-    );
-
->>>>>>> 3f71f8f7a5799fce9f8356325fdfcf1ae5627d15
+Route::get(
+    'file-persyaratan/{id}',
+    [FilePersyaratanController::class, 'show']
+);
