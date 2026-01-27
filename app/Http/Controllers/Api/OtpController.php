@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
-use Carbon\Carbon;
 
 class OtpController extends Controller
 {
@@ -27,18 +27,49 @@ class OtpController extends Controller
             $nohp = $request->nohp;
 
             // =========================
-            // 🔐 RATE LIMIT (1 OTP / 1 MENIT)
+            // RATE LIMIT (anti-spam)
             // =========================
-            $lastOtp = DB::table('otp')
-                ->where('no_hp', $nohp)
-                ->orderByDesc('created_at')
-                ->first();
+            $nohpKey = preg_replace('/\D+/', '', $nohp) ?: $nohp;
+            $ip = $request->ip() ?? 'unknown';
 
-            if ($lastOtp && Carbon::parse($lastOtp->created_at)->diffInSeconds(now()) < 60) {
-                return response()->json([
-                    'code' => 'error',
-                    'message' => 'Tunggu 1 menit sebelum meminta OTP kembali'
-                ], 429);
+            $limits = [
+                [
+                    'key' => "otp:minute:{$nohpKey}",
+                    'max' => 1,
+                    'decay' => 60,
+                    'message' => 'Tunggu 1 menit sebelum meminta OTP kembali',
+                ],
+                [
+                    'key' => "otp:hour:{$nohpKey}",
+                    'max' => 5,
+                    'decay' => 3600,
+                    'message' => 'Terlalu banyak permintaan OTP. Coba lagi dalam 1 jam',
+                ],
+                [
+                    'key' => "otp:day:{$nohpKey}",
+                    'max' => 20,
+                    'decay' => 86400,
+                    'message' => 'Batas harian OTP tercapai. Coba lagi besok',
+                ],
+                [
+                    'key' => "otp:ip:{$ip}",
+                    'max' => 10,
+                    'decay' => 60,
+                    'message' => 'Terlalu banyak permintaan dari IP ini. Coba lagi sebentar',
+                ],
+            ];
+
+            foreach ($limits as $limit) {
+                if (RateLimiter::tooManyAttempts($limit['key'], $limit['max'])) {
+                    return response()->json([
+                        'code' => 'error',
+                        'message' => $limit['message'],
+                        'retry_after' => RateLimiter::availableIn($limit['key']),
+                    ], 429);
+                }
+            }
+            foreach ($limits as $limit) {
+                RateLimiter::hit($limit['key'], $limit['decay']);
             }
 
             // =========================
