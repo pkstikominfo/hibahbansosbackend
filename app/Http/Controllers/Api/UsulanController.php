@@ -14,6 +14,9 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Database\QueryException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 
 class UsulanController extends Controller
@@ -147,72 +150,99 @@ public function showByHash(string $hash)
      */
     public function store(Request $request)
     {
-        try {
-            // =========================
-            // VALIDASI REQUEST
-            // =========================
-            $validated = $request->validate([
-                'judul'              => ['required', 'string', 'max:255'],
-                'anggaran_usulan'    => ['required', 'integer', 'min:0'],
-                'email'              => ['required', 'email'],
-                'nohp'               => ['required', 'string', 'max:15'],
-                'nama'               => ['required', 'string', 'max:100'],
-                'status'             => ['required', 'in:diusulkan'],
-                'idsubjenisbantuan'  => ['required', 'integer'],
-                'idkategori'         => ['required', 'integer'],
-                'iddesa'             => ['required', 'integer'],
-                'kode_opd'           => ['required', 'string'],
-                'tahun'              => ['required', 'digits:4'],
-                'otp'                => ['required', 'digits:6'],
-            ]);
+            try {
+                // =========================
+                // VALIDASI REQUEST
+                // =========================
+                $validated = $request->validate([
+                    'judul'              => ['required', 'string', 'max:255'],
+                    'anggaran_usulan'    => ['required', 'integer', 'min:0'],
+                    'email'              => ['required', 'email'],
+                    'nohp'               => ['required', 'string', 'max:15'],
+                    'nama'               => ['required', 'string', 'max:100'],
+                    'status'             => ['required', 'in:diusulkan'],
+                    'idsubjenisbantuan'  => ['required', 'integer'],
+                    'idkategori'         => ['required', 'integer'],
+                    'iddesa'             => ['required', 'integer'],
+                    'kode_opd'           => ['required', 'string'],
+                    'tahun'              => ['required', 'digits:4'],
+                    'otp'                => ['required', 'digits:6'],
+                ]);
 
-            // =========================
-            // VALIDASI OTP
-            // =========================
-            if (!validateOtp($validated['nohp'], $validated['otp'])) {
+                // =========================
+                // VALIDASI OTP
+                // =========================
+                if (!validateOtp($validated['nohp'], $validated['otp'])) {
+                    return response()->json([
+                        'code' => 'error',
+                        'message' => 'OTP tidak valid atau sudah kedaluwarsa'
+                    ], 422);
+                }
+
+                unset($validated['otp']); // jangan simpan OTP
+
+                // =========================
+                // SIMPAN USULAN
+                // =========================
+                $usulan = Usulan::create($validated);
+                log_bantuan(['id_fk' => $usulan->idusulan]);
+
+                // =========================
+                // KIRIM LINK VIA WHATSAPP
+                // =========================
+            $hash = urlencode(
+                    Crypt::encryptString((string) $usulan->idusulan)
+                );
+
+                $link = url("/api/u/{$hash}");
+
+                $pesan = "📄 *Usulan Anda Berhasil Diproses*\n\n"
+                    . "Judul: {$usulan->judul}\n"
+                    . "Tahun: {$usulan->tahun}\n\n"
+                    . "🔗 *Lihat detail usulan Anda di sini:*\n"
+                    . "{$link}\n\n"
+                    . "Simpan pesan ini untuk referensi Anda.";
+
+                send_whatsapp(getTokenFonte(), $usulan->nohp, $pesan);
+
                 return response()->json([
-                    'code' => 'error',
-                    'message' => 'OTP tidak valid atau sudah kedaluwarsa'
-                ], 422);
-            }
+                    'code'    => 'success',
+                    'message' => 'Usulan berhasil dibuat',
+                    'data'    => $usulan,
+                ], 201);
 
-            unset($validated['otp']); // jangan simpan OTP
+            } catch (ValidationException $e) {
+        return response()->json([
+            'code' => 'validation_error',
+            'message' => 'Data yang dikirim tidak valid',
+            'errors' => $e->errors()
+        ], 422);
 
-            // =========================
-            // SIMPAN USULAN
-            // =========================
-            $usulan = Usulan::create($validated);
-            log_bantuan(['id_fk' => $usulan->idusulan]);
-
-            // =========================
-            // KIRIM LINK VIA WHATSAPP
-            // =========================
-           $hash = urlencode(
-                Crypt::encryptString((string) $usulan->idusulan)
-            );
-
-            $link = url("/api/u/{$hash}");
-
-            $pesan = "📄 *Usulan Anda Berhasil Diproses*\n\n"
-                . "Judul: {$usulan->judul}\n"
-                . "Tahun: {$usulan->tahun}\n\n"
-                . "🔗 *Lihat detail usulan Anda di sini:*\n"
-                . "{$link}\n\n"
-                . "Simpan pesan ini untuk referensi Anda.";
-
-            send_whatsapp(getTokenFonte(), $usulan->nohp, $pesan);
-
+        } catch (QueryException $e) {
             return response()->json([
-                'code'    => 'success',
-                'message' => 'Usulan berhasil dibuat',
-                'data'    => $usulan,
-            ], 201);
+                'code' => 'database_error',
+                'message' => 'Terjadi kesalahan pada database'
+            ], 500);
+
+        } catch (HttpException $e) {
+            return response()->json([
+                'code' => 'http_error',
+                'message' => $e->getMessage()
+            ], $e->getStatusCode());
 
         } catch (\Throwable $e) {
-            return response()->json([
-                'code' => 'error',
-                'message' => 'Gagal membuat usulan',
+
+            // LOG DETAIL UNTUK DEVELOPER
+            \Log::error('Create Usulan Error', [
                 'error' => $e->getMessage(),
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'code' => 'server_error',
+                'message' => 'Terjadi kesalahan pada server, silakan coba lagi'
             ], 500);
         }
     }
@@ -302,7 +332,7 @@ public function showByHash(string $hash)
             ]);
 
             // =========================
-            // VALIDASI OTP (PAKAI NOHP USULAN)
+            // VALIDASI OTP
             // =========================
             if (!validateOtp($usulan->nohp, $validated['otp'])) {
                 return response()->json([
@@ -343,30 +373,67 @@ public function showByHash(string $hash)
                 'data'    => $usulan->fresh(),
             ], 200);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        // =========================
+        // VALIDATION ERROR
+        // =========================
+        } catch (ValidationException $e) {
             return response()->json([
-                'code' => 'error',
+                'code' => 'validation_error',
+                'message' => 'Data yang dikirim tidak valid',
+                'errors' => $e->errors(),
+            ], 422);
+
+        // =========================
+        // DATA TIDAK DITEMUKAN
+        // =========================
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'code' => 'not_found',
                 'message' => 'Usulan tidak ditemukan',
             ], 404);
 
-        } catch (\Exception $e) {
-            // exception dari model (field terlarang)
-            return response()->json([
-                'code' => 'error',
-                'message' => $e->getMessage(),
-            ], 403);
-
-        } catch (\Throwable $e) {
-            return response()->json([
-                'code' => 'error',
-                'message' => 'Gagal memperbarui usulan',
+        // =========================
+        // DATABASE ERROR
+        // =========================
+        } catch (QueryException $e) {
+            \Log::error('Update Usulan - DB Error', [
+                'id' => $id,
                 'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'code' => 'database_error',
+                'message' => 'Terjadi kesalahan pada database',
+            ], 500);
+
+        // =========================
+        // HTTP / FORBIDDEN / THROTTLE
+        // =========================
+        } catch (HttpException $e) {
+            return response()->json([
+                'code' => 'http_error',
+                'message' => $e->getMessage(),
+            ], $e->getStatusCode());
+
+        // =========================
+        // ERROR TAK TERDUGA
+        // =========================
+        } catch (\Throwable $e) {
+
+            \Log::error('Update Usulan - Server Error', [
+                'id'    => $id,
+                'error' => $e->getMessage(),
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'code' => 'server_error',
+                'message' => 'Gagal memperbarui usulan, silakan coba lagi',
             ], 500);
         }
     }
-
-
-
 
 
     public function updateStatus(Request $request, string $id)
