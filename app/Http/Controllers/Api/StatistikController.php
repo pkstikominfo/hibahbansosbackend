@@ -2,75 +2,155 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Usulan;
-use App\Models\Spj;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
-class StatistikController
+class StatistikController extends Controller
 {
     public function getStatistik(Request $request)
     {
-        // helper kecil buat bikin array where sederhana (mendukung IN)
-        $makeWhere = function (?string $col, $val): array {
-            if (empty($col) || $val === null || $val === '') return [];
-            return is_array($val) ? [$col => ['in', $val]] : [$col => $val];
-        };
+        try {
 
-        // 🔹 Tahun global: default tahun sekarang, bisa override ?tahun=2024
-        $tahun = (int) $request->input('tahun', now()->year);
+            /* ==========================
+             * VALIDASI TAHUN
+             * ========================== */
+            $tahun = (int) $request->input('tahun');
+            if ($tahun <= 0) {
+                $tahun = now()->year;
+            }
 
-        // ========= USULAN =========
-        $usulan_where    = $makeWhere(
-            $request->input('usulan_where_column'),
-            $request->input('usulan_where_value')
-        );
-        $usulan_group_by = $request->input('usulan_group_by'); // ex: iddesa
+            /* ==========================
+             * TOTAL GLOBAL
+             * ========================== */
+            $total = DB::table('usulan')
+                ->where('tahun', $tahun)
+                ->selectRaw('
+                    COUNT(*) AS total_usulan,
+                    COALESCE(SUM(anggaran_usulan),0) AS total_anggaran_usulan,
+                    SUM(CASE WHEN status="disetujui" THEN 1 ELSE 0 END) AS total_disetujui,
+                    COALESCE(SUM(CASE WHEN status="disetujui" THEN anggaran_disetujui END),0) AS total_anggaran_disetujui
+                ')
+                ->first();
 
-        // ========= SPJ =========
-        $spj_where = $makeWhere(
-            $request->input('spj_where_column'),
-            $request->input('spj_where_value')
-        );
-        $spj_group_by = $request->input('spj_group_by'); // ex: idkecamatan
+            $spjTotal = DB::table('spj')
+                ->join('usulan','usulan.idusulan','=','spj.idusulan')
+                ->where('usulan.tahun',$tahun)
+                ->selectRaw('
+                    COUNT(spj.idspj) AS total_spj,
+                    COALESCE(SUM(spj.realisasi),0) AS total_realisasi
+                ')
+                ->first();
 
-        // ========= eksekusi per-model =========
-        // USULAN pakai kolom usulan.tahun
-        $jumlahUsulan = (new Usulan)->getStatistikJumlahPenerima(
-            $usulan_where,
-            $usulan_group_by,
-            $tahun
-        );
+            /* ==========================
+             * GROUP BY KECAMATAN (SEMUA)
+             * ========================== */
+            $kecamatan = DB::table('kecamatan')
+                ->leftJoin('desa','desa.idkecamatan','=','kecamatan.idkecamatan')
+                ->leftJoin('usulan', function ($join) use ($tahun) {
+                    $join->on('usulan.iddesa','=','desa.iddesa')
+                         ->where('usulan.tahun','=',$tahun);
+                })
+                ->leftJoin('spj','spj.idusulan','=','usulan.idusulan')
+                ->select(
+                    'kecamatan.idkecamatan',
+                    DB::raw('COUNT(DISTINCT usulan.idusulan) AS total_usulan'),
+                    DB::raw('COALESCE(SUM(usulan.anggaran_usulan),0) AS total_anggaran_usulan'),
+                    DB::raw('SUM(CASE WHEN usulan.status="disetujui" THEN 1 ELSE 0 END) AS total_disetujui'),
+                    DB::raw('COALESCE(SUM(CASE WHEN usulan.status="disetujui" THEN usulan.anggaran_disetujui END),0) AS total_anggaran_disetujui'),
+                    DB::raw('COUNT(DISTINCT spj.idspj) AS total_spj'),
+                    DB::raw('COALESCE(SUM(spj.realisasi),0) AS total_realisasi')
+                )
+                ->groupBy('kecamatan.idkecamatan')
+                ->get()
+                ->map(fn($r) => [
+                    'id_kecamatan' => $r->idkecamatan,
+                    'total' => [
+                        'usulan' => [
+                            'total_usulan' => (int)$r->total_usulan,
+                            'total_anggaran_usulan' => (int)$r->total_anggaran_usulan,
+                        ],
+                        'disetujui' => [
+                            'total_disetujui' => (int)$r->total_disetujui,
+                            'total_anggaran_disetujui' => (int)$r->total_anggaran_disetujui,
+                        ],
+                        'spj' => [
+                            'total_spj' => (int)$r->total_spj,
+                            'total_realisasi' => (int)$r->total_realisasi,
+                        ],
+                    ],
+                ]);
 
-        $jumlahAnggaranUsulan = (new Usulan)->getStatistikJumlahAnggaran(
-            $usulan_where,
-            $usulan_group_by,
-            $tahun
-        );
+            /* ==========================
+             * GROUP BY DESA (SEMUA)
+             * ========================== */
+            $desa = DB::table('desa')
+                ->leftJoin('usulan', function ($join) use ($tahun) {
+                    $join->on('usulan.iddesa','=','desa.iddesa')
+                         ->where('usulan.tahun','=',$tahun);
+                })
+                ->leftJoin('spj','spj.idusulan','=','usulan.idusulan')
+                ->select(
+                    'desa.iddesa',
+                    DB::raw('COUNT(DISTINCT usulan.idusulan) AS total_usulan'),
+                    DB::raw('COALESCE(SUM(usulan.anggaran_usulan),0) AS total_anggaran_usulan'),
+                    DB::raw('SUM(CASE WHEN usulan.status="disetujui" THEN 1 ELSE 0 END) AS total_disetujui'),
+                    DB::raw('COALESCE(SUM(CASE WHEN usulan.status="disetujui" THEN usulan.anggaran_disetujui END),0) AS total_anggaran_disetujui'),
+                    DB::raw('COUNT(DISTINCT spj.idspj) AS total_spj'),
+                    DB::raw('COALESCE(SUM(spj.realisasi),0) AS total_realisasi')
+                )
+                ->groupBy('desa.iddesa')
+                ->get()
+                ->map(fn($r) => [
+                    'id_desa' => $r->iddesa,
+                    'total' => [
+                        'usulan' => [
+                            'total_usulan' => (int)$r->total_usulan,
+                            'total_anggaran_usulan' => (int)$r->total_anggaran_usulan,
+                        ],
+                        'disetujui' => [
+                            'total_disetujui' => (int)$r->total_disetujui,
+                            'total_anggaran_disetujui' => (int)$r->total_anggaran_disetujui,
+                        ],
+                        'spj' => [
+                            'total_spj' => (int)$r->total_spj,
+                            'total_realisasi' => (int)$r->total_realisasi,
+                        ],
+                    ],
+                ]);
 
-        // SPJ pakai usulan.tahun (lihat poin 3 di bawah untuk model Spj)
-        $jumlahSpj = (new Spj)->getStatistikJumlahPenerima(
-            $spj_where,
-            $spj_group_by,
-            $tahun
-        );
+            /* ==========================
+             * RESPONSE
+             * ========================== */
+            return response()->json([
+                'success' => true,
+                'message' => 'Data statistik berhasil diambil',
+                'tahun' => $tahun,
+                'total' => [
+                    'usulan' => [
+                        'total_usulan' => (int)$total->total_usulan,
+                        'total_anggaran_usulan' => (int)$total->total_anggaran_usulan,
+                    ],
+                    'disetujui' => [
+                        'total_disetujui' => (int)$total->total_disetujui,
+                        'total_anggaran_disetujui' => (int)$total->total_anggaran_disetujui,
+                    ],
+                    'spj' => [
+                        'total_spj' => (int)$spjTotal->total_spj,
+                        'total_realisasi' => (int)$spjTotal->total_realisasi,
+                    ],
+                ],
+                'kecamatan' => $kecamatan,
+                'desa' => $desa,
+            ], 200);
 
-        $jumlahAnggaranSpj = (new Spj)->getStatistikJumlahAnggaran(
-            $spj_where,
-            $spj_group_by,
-            $tahun
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data statistik berhasil diambil',
-            'usulan'  => [
-                'total_usulan'          => $jumlahUsulan,
-                'total_anggaran_usulan' => $jumlahAnggaranUsulan,
-            ],
-            'spj'     => [
-                'total_spj'          => $jumlahSpj,
-                'total_anggaran_spj' => $jumlahAnggaranSpj,
-            ],
-        ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil statistik',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\SpjPersyaratanController;
 use App\Http\Controllers\Api\SubJenisBantuanController;
 use App\Http\Controllers\Api\JenisBantuanController;
 use App\Http\Controllers\Api\KategoriController;
+use App\Http\Controllers\Api\OtpController;
 
 
 use App\Http\Controllers\Api\TokenController;
@@ -84,7 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('spj', SpjController::class);
 
     Route::middleware('role:admin')->group(function () {
-        Route::apiResource('users', UserController::class);
+        Route::apiResource('uss', UserController::class);
         Route::get('/users-search', [UserController::class, 'search']);
         Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
         Route::get('/users-paginated', [UserController::class, 'paginated']);
@@ -105,11 +106,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('usulan')->group(function () {
-        Route::get('/', [UsulanController::class, 'index']);
-        Route::get('/{id}', [UsulanController::class, 'show']);
-        Route::put('/{id}', [UsulanController::class, 'update']);
+
         Route::put('/{id}/status', [UsulanController::class, 'updateStatus']);
-        Route::delete('/{id}', action: [UsulanController::class, 'destroy']);
         Route::post('/{id}/approve', [UsulanController::class, 'approve']);
         Route::get('/logs/all', [UsulanController::class, 'getLogs']);
         Route::get('/getByOpd/{kode_opd}', [UsulanController::class, 'getByOpd']);
@@ -185,6 +183,8 @@ Route::prefix('jenis-bantuan')->group(function () {
     );
 });
 
+Route::post('/otp/send', [OtpController::class, 'send']);
+
 // usulan persyaratan routes (public)
 Route::get(
     'usulan-persyaratan/{id}/download',
@@ -208,6 +208,12 @@ Route::delete(
 
 // buat usulan baru (public)
 Route::post('usulan', [UsulanController::class, 'store']);
+Route::put('usulan/{id}', [UsulanController::class, 'update']);
+Route::delete('usulan/{id}', action: [UsulanController::class, 'destroy']);
+Route::get('usulan/', [UsulanController::class, 'index']);
+Route::get('usulan/{id}', [UsulanController::class, 'show']);
+Route::get('/u/{hash}', [UsulanController::class, 'showByHash']);
+
 
 // Public File Persyaratan Routes
 Route::get(

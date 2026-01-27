@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
 
 
 class UsulanController extends Controller
@@ -25,7 +26,7 @@ class UsulanController extends Controller
     public function index(Request $request)
 {
     try {
-        $this->authorize('viewAny', Usulan::class);
+
         $user = $request->user();
 
         $query = Usulan::query()
@@ -97,6 +98,48 @@ class UsulanController extends Controller
     }
 }
 
+public function showByHash(string $hash)
+{
+    try {
+        // =========================
+        // DEKRIP ID USULAN
+        // =========================
+        $idusulan = (int) Crypt::decryptString(urldecode($hash));
+
+        $usulan = Usulan::with([
+            'subJenisBantuan',
+            'kategori',
+            'desa',
+            'opd',
+        ])->findOrFail($idusulan);
+
+        return response()->json([
+            'code'    => 'success',
+            'message' => 'OK',
+            'data'    => $usulan,
+        ]);
+
+    } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+        return response()->json([
+            'code'    => 'error',
+            'message' => 'Link tidak valid atau sudah rusak',
+        ], 400);
+
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json([
+            'code'    => 'error',
+            'message' => 'Data usulan tidak ditemukan',
+        ], 404);
+
+    } catch (\Throwable $e) {
+        return response()->json([
+            'code'    => 'error',
+            'message' => 'Gagal mengambil data usulan',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
+
 
 
     /**
@@ -105,46 +148,75 @@ class UsulanController extends Controller
     public function store(Request $request)
     {
         try {
-            // ✅ Authorization check - hanya pengusul yang bisa buat usulan
-
+            // =========================
+            // VALIDASI REQUEST
+            // =========================
             $validated = $request->validate([
                 'judul'              => ['required', 'string', 'max:255'],
                 'anggaran_usulan'    => ['required', 'integer', 'min:0'],
-                'anggaran_disetujui' => ['nullable', 'integer', 'min:0'],
-                'email'              => ['required', 'email', 'max:50'],
+                'email'              => ['required', 'email'],
                 'nohp'               => ['required', 'string', 'max:15'],
                 'nama'               => ['required', 'string', 'max:100'],
-                'status'             => ['required', Rule::in(['diusulkan', 'disetujui', 'diterima', 'ditolak'])],
-                'idsubjenisbantuan'  => ['required', 'integer', 'exists:sub_jenis_bantuan,idsubjenisbantuan'],
-                'idkategori'         => ['required', 'integer', 'exists:kategori,idkategori'],
-                'iddesa'             => ['required', 'integer', 'exists:desa,iddesa'],
-                'kode_opd'           => ['required', 'string', 'exists:opd,kode_opd'],
-                'tahun'              => ['required', 'digits:4', 'integer', 'min:1900'],
+                'status'             => ['required', 'in:diusulkan'],
+                'idsubjenisbantuan'  => ['required', 'integer'],
+                'idkategori'         => ['required', 'integer'],
+                'iddesa'             => ['required', 'integer'],
+                'kode_opd'           => ['required', 'string'],
+                'tahun'              => ['required', 'digits:4'],
+                'otp'                => ['required', 'digits:6'],
             ]);
 
+            // =========================
+            // VALIDASI OTP
+            // =========================
+            if (!validateOtp($validated['nohp'], $validated['otp'])) {
+                return response()->json([
+                    'code' => 'error',
+                    'message' => 'OTP tidak valid atau sudah kedaluwarsa'
+                ], 422);
+            }
 
-            // ===== Simpan data
+            unset($validated['otp']); // jangan simpan OTP
+
+            // =========================
+            // SIMPAN USULAN
+            // =========================
             $usulan = Usulan::create($validated);
             log_bantuan(['id_fk' => $usulan->idusulan]);
+
+            // =========================
+            // KIRIM LINK VIA WHATSAPP
+            // =========================
+           $hash = urlencode(
+                Crypt::encryptString((string) $usulan->idusulan)
+            );
+
+            $link = url("/api/u/{$hash}");
+
+            $pesan = "📄 *Usulan Anda Berhasil Diproses*\n\n"
+                . "Judul: {$usulan->judul}\n"
+                . "Tahun: {$usulan->tahun}\n\n"
+                . "🔗 *Lihat detail usulan Anda di sini:*\n"
+                . "{$link}\n\n"
+                . "Simpan pesan ini untuk referensi Anda.";
+
+            send_whatsapp(getTokenFonte(), $usulan->nohp, $pesan);
 
             return response()->json([
                 'code'    => 'success',
                 'message' => 'Usulan berhasil dibuat',
                 'data'    => $usulan,
             ], 201);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+
+        } catch (\Throwable $e) {
             return response()->json([
-                'code'    => 'error',
-                'message' => 'Unauthorized: Hanya pengusul yang dapat membuat usulan',
-            ], 403);
-        } catch (Throwable $e) {
-            return response()->json([
-                'code'    => 'error',
-                'message' => 'Gagal membuat Usulan',
-                'error'   => $e->getMessage(),
+                'code' => 'error',
+                'message' => 'Gagal membuat usulan',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
+
 
     /**
      * Display the specified resource.
@@ -155,19 +227,12 @@ class UsulanController extends Controller
             $usulan = Usulan::with(['subJenisBantuan', 'kategori', 'opd', 'desa', 'spj'])->findOrFail($id);
 
             // ✅ Authorization check
-            $this->authorize('view', $usulan);
-
 
             return response()->json([
                 'code'    => 'success',
                 'message' => 'OK',
                 'data'    => $usulan,
             ], 200);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
-            return response()->json([
-                'code'    => 'error',
-                'message' => 'Unauthorized: Anda tidak memiliki akses ke usulan ini',
-            ], 403);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'error',
@@ -224,43 +289,53 @@ class UsulanController extends Controller
         try {
             $usulan = Usulan::findOrFail($id);
 
-            // 🔐 Authorization
-            $this->authorize('update', $usulan);
-
-            /**
-             * =================================================
-             * VALIDASI: JANGAN TERIMA FIELD TERLARANG
-             * =================================================
-             */
+            // =========================
+            // VALIDASI REQUEST
+            // =========================
             $validated = $request->validate([
-                'judul'              => ['sometimes', 'string'],
+                'judul'              => ['sometimes', 'string', 'max:255'],
                 'anggaran_usulan'    => ['sometimes', 'integer', 'min:0'],
-                'anggaran_disetujui' => ['sometimes', 'integer', 'min:0'],
                 'status'             => ['sometimes', 'in:diusulkan,disetujui,diterima,ditolak'],
-                'catatan_ditolak'    => ['sometimes', 'string', 'max:500'],
+                'catatan_ditolak'    => ['sometimes', 'nullable', 'string', 'max:500'],
                 'tahun'              => ['sometimes', 'digits:4'],
+                'otp'                => ['required', 'digits:6'],
             ]);
 
-            // 🚫 Jika request mencoba kirim field terlarang
-            $forbiddenFields = [
-                'iddesa',
-                'email',
-                'nohp',
-                'idsubjenisbantuan',
-                'idkategori',
-                'nama',
-            ];
-
-            foreach ($forbiddenFields as $field) {
-                if ($request->has($field)) {
-                    return response()->json([
-                        'code' => 'error',
-                        'message' => "Field {$field} tidak boleh diubah",
-                    ], 403);
-                }
+            // =========================
+            // VALIDASI OTP (PAKAI NOHP USULAN)
+            // =========================
+            if (!validateOtp($usulan->nohp, $validated['otp'])) {
+                return response()->json([
+                    'code' => 'error',
+                    'message' => 'OTP tidak valid atau sudah kedaluwarsa'
+                ], 422);
             }
 
+            unset($validated['otp']);
+
+            // =========================
+            // UPDATE DATA
+            // =========================
             $usulan->update($validated);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
+
+            // =========================
+            // KIRIM LINK VIA WHATSAPP
+            // =========================
+            $hash = urlencode(
+                Crypt::encryptString((string) $usulan->idusulan)
+            );
+
+            $link = url("/api/u/{$hash}");
+
+            $pesan = "📄 *Usulan Anda Berhasil Diproses*\n\n"
+                . "Judul: {$usulan->judul}\n"
+                . "Tahun: {$usulan->tahun}\n\n"
+                . "🔗 *Lihat detail usulan Anda di sini:*\n"
+                . "{$link}\n\n"
+                . "Simpan pesan ini untuk referensi Anda.";
+
+            send_whatsapp(getTokenFonte(), $usulan->nohp, $pesan);
 
             return response()->json([
                 'code'    => 'success',
@@ -275,13 +350,13 @@ class UsulanController extends Controller
             ], 404);
 
         } catch (\Exception $e) {
-            // Exception dari model (field terlarang)
+            // exception dari model (field terlarang)
             return response()->json([
                 'code' => 'error',
                 'message' => $e->getMessage(),
             ], 403);
 
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'code' => 'error',
                 'message' => 'Gagal memperbarui usulan',
@@ -289,6 +364,9 @@ class UsulanController extends Controller
             ], 500);
         }
     }
+
+
+
 
 
     public function updateStatus(Request $request, string $id)
@@ -381,39 +459,45 @@ class UsulanController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(String $id)
+    public function destroy(Request $request, string $id)
     {
         try {
+            $validated = $request->validate([
+                'otp' => ['required', 'digits:6'],
+            ]);
+
             $usulan = Usulan::findOrFail($id);
 
-            // ✅ Authorization check - hanya admin yang bisa hapus
-            $this->authorize('delete', $usulan);
-
+            // 🔐 VALIDASI OTP BERDASARKAN NOHP USULAN
+            if (!validateOtp($usulan->nohp, $validated['otp'])) {
+                return response()->json([
+                    'code' => 'error',
+                    'message' => 'OTP tidak valid atau sudah kedaluwarsa'
+                ], 422);
+            }
 
             $usulan->delete();
             log_bantuan(['id_fk' => $usulan->idusulan]);
+
             return response()->json([
-                'code'    => 'success',
-                'message' => 'Usulan berhasil dihapus',
-            ], 200);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+                'code' => 'success',
+                'message' => 'Usulan berhasil dihapus'
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
-                'code'    => 'error',
-                'message' => 'Unauthorized: Hanya admin yang dapat menghapus usulan',
-            ], 403);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'code'    => 'error',
-                'message' => 'Usulan tidak ditemukan',
+                'code' => 'error',
+                'message' => 'Usulan tidak ditemukan'
             ], 404);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return response()->json([
-                'code'    => 'error',
+                'code' => 'error',
                 'message' => 'Gagal menghapus usulan',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage()
             ], 500);
         }
     }
+
 
 
     /**
