@@ -40,7 +40,7 @@ class FilePersyaratanController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'id_opd' => 'required|exists:opd,kode_opd',
-                'nama_persayaratan' => 'required|string|max:100',
+                'nama_persyaratan' => 'required|string|max:100',
                 'idsubjenisbantuan' => 'required|exists:sub_jenis_bantuan,idsubjenisbantuan',
             ]);
 
@@ -102,7 +102,7 @@ class FilePersyaratanController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'id_opd' => 'required|exists:opd,kode_opd',
-                'nama_persayaratan' => 'required|string|max:100',
+                'nama_persyaratan' => 'required|string|max:100',
                 'idsubjenisbantuan' => 'required|exists:sub_jenis_bantuan,idsubjenisbantuan',
             ]);
 
