@@ -43,9 +43,9 @@ class UsulanController extends Controller
             ]);
 
         // 🔐 Role Filter
-        if ($user->isPengusul()) {
+        if ($user && $user->isPengusul()) {
             $query->where('usulan.email', $user->email);
-        } elseif ($user->isOpd()) {
+        } elseif ($user && $user->isOpd()) {
             $query->where(function ($q) use ($user) {
                 $q->whereNull('usulan.kode_opd')
                   ->orWhere('usulan.kode_opd', $user->kode_opd);
@@ -219,6 +219,15 @@ public function showByHash(string $hash)
         ], 422);
 
         } catch (QueryException $e) {
+            $usulan->sub_jenis_bantuan = optional($usulan->subJenisBantuan)->namasubjenis;
+            $usulan->kategori = optional($usulan->kategori)->namakategori;
+            $usulan->desa = optional($usulan->desa)->namadesa;
+            $usulan->kode_opd = optional($usulan->opd)->kode_opd;
+            $usulan->unsetRelation('subJenisBantuan');
+            $usulan->unsetRelation('kategori');
+            $usulan->unsetRelation('desa');
+            $usulan->unsetRelation('opd');
+
             return response()->json([
                 'code' => 'database_error',
                 'message' => 'Terjadi kesalahan pada database'
@@ -251,24 +260,60 @@ public function showByHash(string $hash)
     /**
      * Display the specified resource.
      */
-    public function show(String $id)
+    public function show(string $id)
     {
         try {
-            $usulan = Usulan::with(['subJenisBantuan', 'kategori', 'opd', 'desa', 'spj'])->findOrFail($id);
+            $usulan = Usulan::with([
+                // relasi -> ambil kolom penting saja
+                'subJenisBantuan:idsubjenisbantuan,namasubjenis',
+                'kategori:idkategori,namakategori',
+                'desa:iddesa,namadesa',
+                'opd:kode_opd,nama_opd',
 
-            // ✅ Authorization check
+                // relasi lain tetap seperti semula
+                'spj',
+                'usulanPersyaratan',
+            ])->findOrFail($id);
+
+            // ubah path file persyaratan jadi url
+            if ($usulan->relationLoaded('usulanPersyaratan') && $usulan->usulanPersyaratan) {
+                $usulan->usulanPersyaratan->transform(function ($p) {
+                    $p->file_persyaratan = $p->file_persyaratan
+                        ? asset('uploads/' . $p->file_persyaratan)
+                        : null;
+                    return $p;
+                });
+            }
+
+            // ✅ output field jadi STRING sesuai request:
+            // sub_jenis_bantuan = namasubjenis
+            // kategori          = namakategori
+            // desa              = namadesa
+            // kode_opd          = opd.kode_opd
+            $usulan->sub_jenis_bantuan = optional($usulan->subJenisBantuan)->namasubjenis;
+            $usulan->kategori          = optional($usulan->kategori)->namakategori;
+            $usulan->desa              = optional($usulan->desa)->namadesa;
+            $usulan->kode_opd          = optional($usulan->opd)->kode_opd;
+
+            // ✅ buang object relasinya supaya tidak ikut tampil
+            $usulan->unsetRelation('subJenisBantuan');
+            $usulan->unsetRelation('kategori');
+            $usulan->unsetRelation('desa');
+            $usulan->unsetRelation('opd');
 
             return response()->json([
                 'code'    => 'success',
                 'message' => 'OK',
                 'data'    => $usulan,
             ], 200);
+
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Usulan tidak ditemukan',
                 'error'   => $e->getMessage(),
             ], 404);
+
         } catch (Throwable $e) {
             return response()->json([
                 'code'    => 'error',
@@ -277,6 +322,8 @@ public function showByHash(string $hash)
             ], 500);
         }
     }
+
+
 
     public function getByOpd(String $kode_opd)
     {
@@ -314,7 +361,7 @@ public function showByHash(string $hash)
     /**
      * Update the specified resource in storage.
      */
-   public function update(Request $request, string $id)
+    public function update(Request $request, string $id)
     {
         try {
             $usulan = Usulan::findOrFail($id);
@@ -435,6 +482,93 @@ public function showByHash(string $hash)
         }
     }
 
+    public function updateByLogin(Request $request, string $id)
+    {
+        try {
+            $usulan = Usulan::findOrFail($id);
+
+            $this->authorize('update', $usulan);
+
+            $validated = $request->validate([
+                'anggaran_disetujui' => ['sometimes', 'integer', 'min:0'],
+                'id_kategori'        => ['sometimes', 'integer', 'exists:kategori,idkategori'],
+                'idkategori'         => ['sometimes', 'integer', 'exists:kategori,idkategori'],
+                'kode_opd'           => ['sometimes', 'string', 'exists:opd,kode_opd'],
+                'opd'                => ['sometimes', 'string', 'exists:opd,kode_opd'],
+            ]);
+
+            if (array_key_exists('id_kategori', $validated)) {
+                $validated['idkategori'] = $validated['id_kategori'];
+                unset($validated['id_kategori']);
+            }
+
+            if (array_key_exists('opd', $validated)) {
+                $validated['kode_opd'] = $validated['opd'];
+                unset($validated['opd']);
+            }
+
+            if (!$validated) {
+                return response()->json([
+                    'code'    => 'validation_error',
+                    'message' => 'Tidak ada data untuk diperbarui',
+                ], 422);
+            }
+
+            $usulan->update($validated);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'Usulan berhasil diperbarui',
+                'data'    => $usulan->fresh(),
+            ], 200);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'code' => 'validation_error',
+                'message' => 'Data yang dikirim tidak valid',
+                'errors' => $e->errors(),
+            ], 422);
+
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Unauthorized',
+            ], 403);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'code'    => 'not_found',
+                'message' => 'Usulan tidak ditemukan',
+            ], 404);
+
+        } catch (QueryException $e) {
+            \Log::error('Update Usulan (Login) - DB Error', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'code'    => 'database_error',
+                'message' => 'Terjadi kesalahan pada database',
+            ], 500);
+
+        } catch (\Throwable $e) {
+            \Log::error('Update Usulan (Login) - Server Error', [
+                'id'    => $id,
+                'error' => $e->getMessage(),
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'code' => 'server_error',
+                'message' => 'Gagal memperbarui usulan, silakan coba lagi',
+            ], 500);
+        }
+    }
+
 
     public function updateStatus(Request $request, string $id)
     {
@@ -445,6 +579,13 @@ public function showByHash(string $hash)
 
             // Authorization
             $this->authorize('update', $usulan);
+
+            if ($usulan->status === 'disetujui') {
+                return response()->json([
+                    'code'    => 'error',
+                    'message' => 'Status usulan sudah disetujui dan tidak bisa diubah',
+                ], 422);
+            }
 
             // Validasi request
             $validated = $request->validate([

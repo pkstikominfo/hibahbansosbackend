@@ -108,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('usulan')->group(function () {
 
         Route::put('/{id}/status', [UsulanController::class, 'updateStatus']);
+        Route::put('/{id}/update-login', [UsulanController::class, 'updateByLogin']);
         Route::post('/{id}/approve', [UsulanController::class, 'approve']);
         Route::get('/logs/all', [UsulanController::class, 'getLogs']);
         Route::get('/getByOpd/{kode_opd}', [UsulanController::class, 'getByOpd']);

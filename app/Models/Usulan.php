@@ -112,4 +112,13 @@ class Usulan extends Model
             'idusulan'    // PK di tabel usulan
         );
     }
+
+    public function usulanPersyaratan()
+    {
+        return $this->hasMany(
+            UsulanPersyaratan::class,
+            'idusulan',
+            'idusulan'
+        );
+    }
 }
