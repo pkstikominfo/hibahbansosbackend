@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('token', TokenController::class);
 
     Route::apiResource('spj', SpjController::class);
+    Route::get('spj/getByUsulan/{idusulan}', [SpjController::class, 'getByUsulan']);
 
     Route::middleware('role:admin')->group(function () {
         Route::apiResource('uss', UserController::class);

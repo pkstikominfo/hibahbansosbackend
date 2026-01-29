@@ -366,6 +366,41 @@ if ($search = trim($request->input('q'))) {
         }
     }
 
+    public function getByUsulan(string $idusulan)
+    {
+        try {
+            $spj = Spj::with('usulan')
+                ->where('idusulan', $idusulan)
+                ->get();
+
+            if ($spj->isEmpty()) {
+                return response()->json([
+                    'code'    => 'error',
+                    'message' => 'SPJ tidak ditemukan',
+                ], 404);
+            }
+
+            $spj->each(function ($item) {
+                $item->foto = $item->foto
+                    ? Storage::url('uploads/' . $item->foto)
+                    : null;
+            });
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'OK',
+                'data'    => $spj,
+            ], 200);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'SPJ tidak ditemukan',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Update the specified resource in storage.
      */
