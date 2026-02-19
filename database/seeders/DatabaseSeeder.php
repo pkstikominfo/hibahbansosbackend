@@ -17,7 +17,7 @@ class DatabaseSeeder extends Seeder
             JenisBantuanSeeder::class,
             SubJenisBantuanSeeder::class,
             KategoriSeeder::class,
-            DummyDataSeeder::class
+            RealDummyDataSeeder::class
         ]);
 
         // Token fonte
