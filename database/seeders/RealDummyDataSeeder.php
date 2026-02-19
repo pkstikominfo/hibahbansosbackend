@@ -26,8 +26,6 @@ class RealDummyDataSeeder extends Seeder
         $now = Carbon::now();
         $user = User::first();
         $userId = $user ? $user->id : 1;
-
-        // 2. Buat Master File Persyaratan (Sesuai kolom nama_persayaratan di SQL)
         $masterFp = [
             'KTP Pemohon',
             'Kartu Keluarga',
@@ -40,7 +38,7 @@ class RealDummyDataSeeder extends Seeder
         foreach ($masterFp as $nama) {
             $fpIds[] = DB::table('file_persyaratan')->insertGetId([
                 'id_opd' => 'OPD005',
-                'nama_persayaratan' => $nama,
+                'nama_persyaratan' => $nama,
                 'idsubjenisbantuan' => 3,
             ]);
         }
