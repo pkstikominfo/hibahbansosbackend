@@ -17,12 +17,28 @@ class AdditionalUserSeeder extends Seeder
      */
     public function run(): void
     {
-        Schema::disableForeignKeyConstraints();
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+
+        // Truncate semua tabel yang berelasi (child dulu, baru parent)
+        DB::table('spj')->truncate();
+        // DB::table('spj_detail')->truncate(); // tambahkan jika ada
         DB::table('users')->truncate();
-        Schema::enableForeignKeyConstraints();
-        // Ambil semua OPD yang ada
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+
         $opds = Opd::all();
-        // Data user OPD (8 user)
+        $totalCreated = 0;
+        $allUsers = array_merge($adminUsers, $opdUsers, $pengusulUsers);
+
+        foreach ($allUsers as $userData) {
+            // Hapus pengecekan existingUser - tidak perlu setelah truncate
+            User::create(array_merge($userData, [
+                'password' => Hash::make('password123'),
+                'status' => 'active'
+            ]));
+            $totalCreated++;
+            $this->command->info("Created {$userData['peran']} user: {$userData['username']}");
+        }
 
         $adminUsers = [
             [
