@@ -210,6 +210,7 @@ Route::delete(
 
 // buat usulan baru (public)
 Route::post('usulan', [UsulanController::class, 'store']);
+Route::post('usulan/no-otp', [UsulanController::class, 'storeTanpaOtpDisetujui']);
 Route::put('usulan/{id}', [UsulanController::class, 'update']);
 Route::delete('usulan/{id}', action: [UsulanController::class, 'destroy']);
 Route::get('usulan/', [UsulanController::class, 'index']);

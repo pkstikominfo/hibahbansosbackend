@@ -256,6 +256,82 @@ public function showByHash(string $hash)
         }
     }
 
+    /**
+     * Store usulan tanpa OTP dan langsung disetujui.
+     */
+    public function storeTanpaOtpDisetujui(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'judul'             => ['required', 'string', 'max:255'],
+                'anggaran_usulan'   => ['required', 'integer', 'min:0'],
+                'email'             => ['required', 'email'],
+                'nohp'              => ['required', 'string', 'max:15'],
+                'nama'              => ['required', 'string', 'max:100'],
+                'idsubjenisbantuan' => ['required', 'integer'],
+                'idkategori'        => ['required', 'integer'],
+                'iddesa'            => ['required', 'integer'],
+                'kode_opd'          => ['required', 'string'],
+                'tahun'             => ['required', 'digits:4'],
+            ]);
+
+            $validated['status'] = 'disetujui';
+            $validated['anggaran_disetujui'] = $validated['anggaran_usulan'];
+
+            $usulan = Usulan::create($validated);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
+
+            $hash = urlencode(
+                Crypt::encryptString((string) $usulan->idusulan)
+            );
+
+            $link = url("/api/u/{$hash}");
+
+            $pesan = "📄 *Usulan Anda Berhasil Diproses*\n\n"
+                . "Judul: {$usulan->judul}\n"
+                . "Tahun: {$usulan->tahun}\n\n"
+                . "🔗 *Lihat detail usulan Anda di sini:*\n"
+                . "{$link}\n\n"
+                . "Simpan pesan ini untuk referensi Anda.";
+
+            send_whatsapp(getTokenFonte(), $usulan->nohp, $pesan);
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'Usulan berhasil dibuat dan langsung disetujui',
+                'data'    => $usulan,
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'code' => 'validation_error',
+                'message' => 'Data yang dikirim tidak valid',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (QueryException $e) {
+            return response()->json([
+                'code' => 'database_error',
+                'message' => 'Terjadi kesalahan pada database'
+            ], 500);
+        } catch (HttpException $e) {
+            return response()->json([
+                'code' => 'http_error',
+                'message' => $e->getMessage()
+            ], $e->getStatusCode());
+        } catch (\Throwable $e) {
+            \Log::error('Create Usulan Tanpa OTP Error', [
+                'error' => $e->getMessage(),
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'code' => 'server_error',
+                'message' => 'Terjadi kesalahan pada server, silakan coba lagi'
+            ], 500);
+        }
+    }
+
 
     /**
      * Display the specified resource.
