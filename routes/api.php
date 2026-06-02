@@ -3,9 +3,9 @@
 use App\Models\Spj;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SSOController;
 use App\Http\Controllers\Api\OpdController;
 use App\Http\Controllers\Api\SpjController;
-use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DesaController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UsulanController;
@@ -18,27 +18,23 @@ use App\Http\Controllers\Api\SubJenisBantuanController;
 use App\Http\Controllers\Api\JenisBantuanController;
 use App\Http\Controllers\Api\KategoriController;
 use App\Http\Controllers\Api\OtpController;
-
-
 use App\Http\Controllers\Api\TokenController;
 
-
-
-// Public routes (tanpa authentication)
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/register', [AuthController::class, 'register']);
+// ─── SSO BDS ────────────────────────────────────────────────
+Route::prefix('auth')->group(function () {
+    Route::get('/url', [SSOController::class, 'getLoginUrl']);
+    Route::post('/callback', [SSOController::class, 'exchangeCode']);
+    Route::post('/refresh', [SSOController::class, 'refreshToken']);
+    Route::post('/logout', [SSOController::class, 'logout']);
+    Route::post('/backchannel-logout', [SSOController::class, 'backchannelLogout']);
 });
 
-
+// ─── Public ─────────────────────────────────────────────────
 Route::prefix('kecamatan')->group(function () {
     Route::get('/', [KecamatanController::class, 'index']);
     Route::get('/search', [KecamatanController::class, 'search']);
     Route::get('/{id}', [KecamatanController::class, 'show']);
 });
-
 
 Route::prefix('desa')->group(function () {
     Route::get('/', [DesaController::class, 'index']);
@@ -50,19 +46,10 @@ Route::prefix('desa')->group(function () {
     Route::get('/{id}', [DesaController::class, 'show']);
 });
 
-
-
 Route::apiResource('opd', OpdController::class);
 Route::get('/opd-search', [OpdController::class, 'search']);
 Route::get('/opd-with-users-count', [OpdController::class, 'withUsersCount']);
 Route::get('/opd-paginated', [OpdController::class, 'paginated']);
-
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/opd-me', [OpdController::class, 'me']);
-});
-
-
-
 
 Route::get('/log-usulan', [UsulanController::class, 'getLogs']);
 Route::apiResource('spj', SpjController::class);
@@ -74,18 +61,54 @@ Route::get('/log-bantuan', [UsulanController::class, 'getLogs']);
 Route::get('/statistik', [StatistikController::class, 'getStatistik']);
 Route::get('/sebaran-data', [UsulanController::class, 'getSebaranAnggaranDisetujui']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [AuthController::class, 'user']);
-    Route::put('/user/profile', [AuthController::class, 'updateProfile']);
-    Route::put('/user/change-password', [AuthController::class, 'changePassword']);
+Route::prefix('sub-jenis-bantuan')->group(function () {
+    Route::get('/', [SubJenisBantuanController::class, 'index']);
+    Route::get('/detail/{id_subjenisbantuan}', [SubJenisBantuanController::class, 'show']);
+    Route::get('/jenis/{id_jenisbantuan}', [SubJenisBantuanController::class, 'getByJenisBantuan']);
+    Route::get('/kategori/{id_kategori}', [SubJenisBantuanController::class, 'getByKategori']);
+});
+
+Route::prefix('kategori')->group(function () {
+    Route::get('/', [KategoriController::class, 'index']);
+    Route::get('/detail/{id_kategori}', [KategoriController::class, 'show']);
+    Route::get('/jenis/{id_jenisbantuan}', [KategoriController::class, 'getByJenisBantuan']);
+});
+
+Route::prefix('jenis-bantuan')->group(function () {
+    Route::get('/', [JenisBantuanController::class, 'index']);
+    Route::get('/detail/{id_jenisbantuan}', [JenisBantuanController::class, 'show']);
+});
+
+Route::post('/otp/send', [OtpController::class, 'send']);
+
+Route::get('usulan-persyaratan/{id}/download', [UsulanPersyaratanController::class, 'download']);
+Route::post('usulan-persyaratan', [UsulanPersyaratanController::class, 'store']);
+Route::put('usulan-persyaratan/{id}', [UsulanPersyaratanController::class, 'update']);
+Route::delete('usulan-persyaratan/{id}', [UsulanPersyaratanController::class, 'destroy']);
+
+Route::post('usulan', [UsulanController::class, 'store']);
+Route::post('usulan/no-otp', [UsulanController::class, 'storeTanpaOtpDisetujui']);
+Route::put('usulan/{id}', [UsulanController::class, 'update']);
+Route::delete('usulan/{id}', [UsulanController::class, 'destroy']);
+Route::get('usulan/', [UsulanController::class, 'index']);
+Route::get('usulan/{id}', [UsulanController::class, 'show']);
+Route::get('/u/{hash}', [UsulanController::class, 'showByHash']);
+
+Route::get('file-persyaratan', [FilePersyaratanController::class, 'index']);
+Route::get('file-persyaratan/by-opd', [FilePersyaratanController::class, 'getByOpd']);
+Route::get('file-persyaratan/{id}', [FilePersyaratanController::class, 'show']);
+
+// ─── Protected (SSO) ────────────────────────────────────────
+Route::middleware('sso')->group(function () {
+
+    Route::get('/opd-me', [OpdController::class, 'me']);
 
     Route::apiResource('token', TokenController::class);
 
     Route::apiResource('spj', SpjController::class);
     Route::get('spj/getByUsulan/{idusulan}', [SpjController::class, 'getByUsulan']);
 
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware('role:superadmin')->group(function () {
         Route::apiResource('uss', UserController::class);
         Route::get('/users-search', [UserController::class, 'search']);
         Route::get('/users-by-role/{role}', [UserController::class, 'getByRole']);
@@ -107,7 +130,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('usulan')->group(function () {
-
         Route::put('/{id}/status', [UsulanController::class, 'updateStatus']);
         Route::put('/{id}/update-login', [UsulanController::class, 'updateByLogin']);
         Route::post('/{id}/approve', [UsulanController::class, 'approve']);
@@ -115,119 +137,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/getByOpd/{kode_opd}', [UsulanController::class, 'getByOpd']);
     });
 
-    // File Persyaratan Routes
-    Route::post(
-        'file-persyaratan',
-        [FilePersyaratanController::class, 'store']
-    );
-    Route::get(
-        'file-persyaratan/by-login-opd',
-        [FilePersyaratanController::class, 'getByLoginOpd']
-    );
-
-    Route::put(
-        'file-persyaratan/{id}',
-        [FilePersyaratanController::class, 'update']
-    );
-    Route::delete(
-        'file-persyaratan/{id}',
-        [FilePersyaratanController::class, 'destroy']
-    );
-    // Usulan Persyaratan Routes
-
+    Route::post('file-persyaratan', [FilePersyaratanController::class, 'store']);
+    Route::get('file-persyaratan/by-login-opd', [FilePersyaratanController::class, 'getByLoginOpd']);
+    Route::put('file-persyaratan/{id}', [FilePersyaratanController::class, 'update']);
+    Route::delete('file-persyaratan/{id}', [FilePersyaratanController::class, 'destroy']);
 });
-
-Route::prefix('sub-jenis-bantuan')->group(function () {
-
-    Route::get('/', [SubJenisBantuanController::class, 'index']);
-    // by ID sub jenis bantuan
-    Route::get('/detail/{id_subjenisbantuan}', [SubJenisBantuanController::class, 'show']);
-
-    // by jenis bantuan
-    Route::get('/jenis/{id_jenisbantuan}', [SubJenisBantuanController::class, 'getByJenisBantuan']);
-
-    // by kategori
-    Route::get('/kategori/{id_kategori}', [SubJenisBantuanController::class, 'getByKategori']);
-});
-
-
-Route::prefix('kategori')->group(function () {
-
-    Route::get(
-        '/',
-        [KategoriController::class, 'index']
-    );
-
-    // by ID sub jenis bantuan
-    Route::get(
-        '/detail/{id_kategori}',
-        [KategoriController::class, 'show']
-    );
-
-    // by jenis bantuan
-    Route::get(
-        '/jenis/{id_jenisbantuan}',
-        [KategoriController::class, 'getByJenisBantuan']
-    );
-});
-
-Route::prefix('jenis-bantuan')->group(function () {
-
-    Route::get(
-        '/',
-        [JenisBantuanController::class, 'index']
-    );
-
-    // by ID sub jenis bantuan
-    Route::get(
-        '/detail/{id_jenisbantuan}',
-        [JenisBantuanController::class, 'show']
-    );
-});
-
-Route::post('/otp/send', [OtpController::class, 'send']);
-
-// usulan persyaratan routes (public)
-Route::get(
-    'usulan-persyaratan/{id}/download',
-    [UsulanPersyaratanController::class, 'download']
-);
-Route::post(
-    'usulan-persyaratan',
-    [UsulanPersyaratanController::class, 'store']
-);
-
-Route::put(
-    'usulan-persyaratan/{id}',
-    [UsulanPersyaratanController::class, 'update']
-);
-
-Route::delete(
-    'usulan-persyaratan/{id}',
-    [UsulanPersyaratanController::class, 'destroy']
-);
-// end usulan persyaratan routes
-
-// buat usulan baru (public)
-Route::post('usulan', [UsulanController::class, 'store']);
-Route::post('usulan/no-otp', [UsulanController::class, 'storeTanpaOtpDisetujui']);
-Route::put('usulan/{id}', [UsulanController::class, 'update']);
-Route::delete('usulan/{id}', action: [UsulanController::class, 'destroy']);
-Route::get('usulan/', [UsulanController::class, 'index']);
-Route::get('usulan/{id}', [UsulanController::class, 'show']);
-Route::get('/u/{hash}', [UsulanController::class, 'showByHash']);
-
-
-// Public File Persyaratan Routes
-Route::get(
-    'file-persyaratan',
-    [FilePersyaratanController::class, 'index']
-);
-Route::get(
-    'file-persyaratan/by-opd',
-    [FilePersyaratanController::class, 'getByOpd']
-);
-Route::get(
-    'file-persyaratan/{id}',
-    [FilePersyaratanController::class, 'show']
-);

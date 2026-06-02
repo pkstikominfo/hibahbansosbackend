@@ -27,121 +27,128 @@ class UsulanController extends Controller
      * Display a listing of the resource with authorization filter
      */
     public function index(Request $request)
-{
-    try {
+    {
+        try {
 
-        $user = $request->user();
+            // Ambil data user dari SSO token (null jika request public/tanpa token)
+            $ssoUser = $request->sso_user ?? null;
+            $ssoRoles = $ssoUser['realm_access']['roles'] ?? [];
 
-        $query = Usulan::query()
-            ->leftJoin('kategori', 'usulan.idkategori', '=', 'kategori.idkategori')
-            ->leftJoin('sub_jenis_bantuan', 'usulan.idsubjenisbantuan', '=', 'sub_jenis_bantuan.idsubjenisbantuan')
-            ->with('usulanPersyaratan')
-            ->select([
-                'usulan.*',
-                'kategori.namakategori as nama_kategori',
-                'sub_jenis_bantuan.namasubjenis as nama_subjenis',
+            $query = Usulan::query()
+                ->leftJoin('kategori', 'usulan.idkategori', '=', 'kategori.idkategori')
+                ->leftJoin('sub_jenis_bantuan', 'usulan.idsubjenisbantuan', '=', 'sub_jenis_bantuan.idsubjenisbantuan')
+                ->with('usulanPersyaratan')
+                ->select([
+                    'usulan.*',
+                    'kategori.namakategori as nama_kategori',
+                    'sub_jenis_bantuan.namasubjenis as nama_subjenis',
+                ]);
+
+            // 🔐 Role Filter — sesuaikan nama role dengan yang ada di Keycloak
+            if ($ssoUser) {
+                if (in_array('pengusul', $ssoRoles)) {
+                    // Pengusul hanya lihat usulan miliknya sendiri (by email)
+                    $query->where('usulan.email', $ssoUser['email']);
+                } elseif (in_array('admin_opd', $ssoRoles)) {
+                    // OPD hanya lihat usulan di bawah OPD-nya
+                    $kodeOpd = $ssoUser['kode_opd'] ?? null;
+                    if ($kodeOpd) {
+                        $query->where(function ($q) use ($kodeOpd) {
+                            $q->whereNull('usulan.kode_opd')
+                                ->orWhere('usulan.kode_opd', $kodeOpd);
+                        });
+                    }
+                }
+                // superadmin → tidak ada filter, lihat semua
+            }
+            // Jika request public (tanpa token) → tampilkan semua (sesuai behavior lama)
+
+            // 🔍 Search
+            if ($search = $request->q) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('usulan.judul', 'like', "%$search%")
+                        ->orWhere('kategori.namakategori', 'like', "%$search%")
+                        ->orWhere('sub_jenis_bantuan.namasubjenis', 'like', "%$search%");
+                });
+            }
+
+            // 🔽 Sorting
+            $sortBy  = $request->input('sort_by', 'idusulan');
+            $sortDir = $request->input('sort_dir', 'asc');
+
+            $query->orderBy($sortBy, $sortDir);
+
+            // 🔄 Pagination
+            $usulan = $query->paginate(
+                (int) $request->input('per_page', 10)
+            );
+
+            // 🔗 UBAH file_persyaratan → LINK
+            $usulan->getCollection()->transform(function ($item) {
+                $item->usulanPersyaratan->transform(function ($p) {
+                    $p->file_persyaratan = $p->file_persyaratan
+                        ? asset('uploads/' . $p->file_persyaratan)
+                        : null;
+                    return $p;
+                });
+                return $item;
+            });
+
+            return response()->json([
+                'code' => 'success',
+                'data' => $usulan->items(),
+                'meta' => [
+                    'page' => $usulan->currentPage(),
+                    'total' => $usulan->total()
+                ]
             ]);
-
-        // 🔐 Role Filter
-        if ($user && $user->isPengusul()) {
-            $query->where('usulan.email', $user->email);
-        } elseif ($user && $user->isOpd()) {
-            $query->where(function ($q) use ($user) {
-                $q->whereNull('usulan.kode_opd')
-                  ->orWhere('usulan.kode_opd', $user->kode_opd);
-            });
+        } catch (Throwable $e) {
+            return response()->json([
+                'code' => 'error',
+                'message' => 'Gagal mengambil data',
+                'error' => $e->getMessage()
+            ], 500);
         }
+    }
 
-        // 🔍 Search
-        if ($search = $request->q) {
-            $query->where(function ($q) use ($search) {
-                $q->where('usulan.judul', 'like', "%$search%")
-                  ->orWhere('kategori.namakategori', 'like', "%$search%")
-                  ->orWhere('sub_jenis_bantuan.namasubjenis', 'like', "%$search%");
-            });
+    public function showByHash(string $hash)
+    {
+        try {
+            // =========================
+            // DEKRIP ID USULAN
+            // =========================
+            $idusulan = (int) Crypt::decryptString(urldecode($hash));
+
+            $usulan = Usulan::with([
+                'subJenisBantuan',
+                'kategori',
+                'desa',
+                'opd',
+            ])->findOrFail($idusulan);
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'OK',
+                'data'    => $usulan,
+            ]);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Link tidak valid atau sudah rusak',
+            ], 400);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Data usulan tidak ditemukan',
+            ], 404);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code'    => 'error',
+                'message' => 'Gagal mengambil data usulan',
+                'error'   => $e->getMessage(),
+            ], 500);
         }
-
-        // 🔽 Sorting
-        $sortBy  = $request->input('sort_by', 'idusulan');
-        $sortDir = $request->input('sort_dir', 'asc');
-
-        $query->orderBy($sortBy, $sortDir);
-
-        // 🔄 Pagination
-        $usulan = $query->paginate(
-            (int) $request->input('per_page', 10)
-        );
-
-        // 🔗 UBAH file_persyaratan → LINK
-        $usulan->getCollection()->transform(function ($item) {
-            $item->usulanPersyaratan->transform(function ($p) {
-                $p->file_persyaratan = $p->file_persyaratan
-                    ? asset('uploads/' . $p->file_persyaratan)
-                    : null;
-                return $p;
-            });
-            return $item;
-        });
-
-        return response()->json([
-            'code' => 'success',
-            'data' => $usulan->items(),
-            'meta' => [
-                'page' => $usulan->currentPage(),
-                'total' => $usulan->total()
-            ]
-        ]);
-
-    } catch (Throwable $e) {
-        return response()->json([
-            'code' => 'error',
-            'message' => 'Gagal mengambil data',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
-
-public function showByHash(string $hash)
-{
-    try {
-        // =========================
-        // DEKRIP ID USULAN
-        // =========================
-        $idusulan = (int) Crypt::decryptString(urldecode($hash));
-
-        $usulan = Usulan::with([
-            'subJenisBantuan',
-            'kategori',
-            'desa',
-            'opd',
-        ])->findOrFail($idusulan);
-
-        return response()->json([
-            'code'    => 'success',
-            'message' => 'OK',
-            'data'    => $usulan,
-        ]);
-
-    } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
-        return response()->json([
-            'code'    => 'error',
-            'message' => 'Link tidak valid atau sudah rusak',
-        ], 400);
-
-    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-        return response()->json([
-            'code'    => 'error',
-            'message' => 'Data usulan tidak ditemukan',
-        ], 404);
-
-    } catch (\Throwable $e) {
-        return response()->json([
-            'code'    => 'error',
-            'message' => 'Gagal mengambil data usulan',
-            'error'   => $e->getMessage(),
-        ], 500);
-    }
-}
 
 
 
@@ -150,74 +157,72 @@ public function showByHash(string $hash)
      */
     public function store(Request $request)
     {
-            try {
-                // =========================
-                // VALIDASI REQUEST
-                // =========================
-                $validated = $request->validate([
-                    'judul'              => ['required', 'string', 'max:255'],
-                    'anggaran_usulan'    => ['required', 'integer', 'min:0'],
-                    'email'              => ['required', 'email'],
-                    'nohp'               => ['required', 'string', 'max:15'],
-                    'nama'               => ['required', 'string', 'max:100'],
-                    'status'             => ['required', 'in:diusulkan'],
-                    'idsubjenisbantuan'  => ['required', 'integer'],
-                    'idkategori'         => ['required', 'integer'],
-                    'iddesa'             => ['required', 'integer'],
-                    'kode_opd'           => ['required', 'string'],
-                    'tahun'              => ['required', 'digits:4'],
-                    'otp'                => ['required', 'digits:6'],
-                ]);
+        try {
+            // =========================
+            // VALIDASI REQUEST
+            // =========================
+            $validated = $request->validate([
+                'judul'              => ['required', 'string', 'max:255'],
+                'anggaran_usulan'    => ['required', 'integer', 'min:0'],
+                'email'              => ['required', 'email'],
+                'nohp'               => ['required', 'string', 'max:15'],
+                'nama'               => ['required', 'string', 'max:100'],
+                'status'             => ['required', 'in:diusulkan'],
+                'idsubjenisbantuan'  => ['required', 'integer'],
+                'idkategori'         => ['required', 'integer'],
+                'iddesa'             => ['required', 'integer'],
+                'kode_opd'           => ['required', 'string'],
+                'tahun'              => ['required', 'digits:4'],
+                'otp'                => ['required', 'digits:6'],
+            ]);
 
-                // =========================
-                // VALIDASI OTP
-                // =========================
-                if (!validateOtp($validated['nohp'], $validated['otp'])) {
-                    return response()->json([
-                        'code' => 'error',
-                        'message' => 'OTP tidak valid atau sudah kedaluwarsa'
-                    ], 422);
-                }
-
-                unset($validated['otp']); // jangan simpan OTP
-
-                // =========================
-                // SIMPAN USULAN
-                // =========================
-                $usulan = Usulan::create($validated);
-                log_bantuan(['id_fk' => $usulan->idusulan]);
-
-                // =========================
-                // KIRIM LINK VIA WHATSAPP
-                // =========================
-            $hash = urlencode(
-                    Crypt::encryptString((string) $usulan->idusulan)
-                );
-
-                $link = url("/api/u/{$hash}");
-
-                $pesan = "📄 *Usulan Anda Berhasil Diproses*\n\n"
-                    . "Judul: {$usulan->judul}\n"
-                    . "Tahun: {$usulan->tahun}\n\n"
-                    . "🔗 *Lihat detail usulan Anda di sini:*\n"
-                    . "{$link}\n\n"
-                    . "Simpan pesan ini untuk referensi Anda.";
-
-                send_whatsapp(getTokenFonte(), $usulan->nohp, $pesan);
-
+            // =========================
+            // VALIDASI OTP
+            // =========================
+            if (!validateOtp($validated['nohp'], $validated['otp'])) {
                 return response()->json([
-                    'code'    => 'success',
-                    'message' => 'Usulan berhasil dibuat',
-                    'data'    => $usulan,
-                ], 201);
+                    'code' => 'error',
+                    'message' => 'OTP tidak valid atau sudah kedaluwarsa'
+                ], 422);
+            }
 
-            } catch (ValidationException $e) {
-        return response()->json([
-            'code' => 'validation_error',
-            'message' => 'Data yang dikirim tidak valid',
-            'errors' => $e->errors()
-        ], 422);
+            unset($validated['otp']); // jangan simpan OTP
 
+            // =========================
+            // SIMPAN USULAN
+            // =========================
+            $usulan = Usulan::create($validated);
+            log_bantuan(['id_fk' => $usulan->idusulan]);
+
+            // =========================
+            // KIRIM LINK VIA WHATSAPP
+            // =========================
+            $hash = urlencode(
+                Crypt::encryptString((string) $usulan->idusulan)
+            );
+
+            $link = url("/api/u/{$hash}");
+
+            $pesan = "📄 *Usulan Anda Berhasil Diproses*\n\n"
+                . "Judul: {$usulan->judul}\n"
+                . "Tahun: {$usulan->tahun}\n\n"
+                . "🔗 *Lihat detail usulan Anda di sini:*\n"
+                . "{$link}\n\n"
+                . "Simpan pesan ini untuk referensi Anda.";
+
+            send_whatsapp(getTokenFonte(), $usulan->nohp, $pesan);
+
+            return response()->json([
+                'code'    => 'success',
+                'message' => 'Usulan berhasil dibuat',
+                'data'    => $usulan,
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'code' => 'validation_error',
+                'message' => 'Data yang dikirim tidak valid',
+                'errors' => $e->errors()
+            ], 422);
         } catch (QueryException $e) {
             $usulan->sub_jenis_bantuan = optional($usulan->subJenisBantuan)->namasubjenis;
             $usulan->kategori = optional($usulan->kategori)->namakategori;
@@ -232,13 +237,11 @@ public function showByHash(string $hash)
                 'code' => 'database_error',
                 'message' => 'Terjadi kesalahan pada database'
             ], 500);
-
         } catch (HttpException $e) {
             return response()->json([
                 'code' => 'http_error',
                 'message' => $e->getMessage()
             ], $e->getStatusCode());
-
         } catch (\Throwable $e) {
 
             // LOG DETAIL UNTUK DEVELOPER
@@ -382,14 +385,12 @@ public function showByHash(string $hash)
                 'message' => 'OK',
                 'data'    => $usulan,
             ], 200);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Usulan tidak ditemukan',
                 'error'   => $e->getMessage(),
             ], 404);
-
         } catch (Throwable $e) {
             return response()->json([
                 'code'    => 'error',
@@ -496,9 +497,9 @@ public function showByHash(string $hash)
                 'data'    => $usulan->fresh(),
             ], 200);
 
-        // =========================
-        // VALIDATION ERROR
-        // =========================
+            // =========================
+            // VALIDATION ERROR
+            // =========================
         } catch (ValidationException $e) {
             return response()->json([
                 'code' => 'validation_error',
@@ -506,18 +507,18 @@ public function showByHash(string $hash)
                 'errors' => $e->errors(),
             ], 422);
 
-        // =========================
-        // DATA TIDAK DITEMUKAN
-        // =========================
+            // =========================
+            // DATA TIDAK DITEMUKAN
+            // =========================
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'code' => 'not_found',
                 'message' => 'Usulan tidak ditemukan',
             ], 404);
 
-        // =========================
-        // DATABASE ERROR
-        // =========================
+            // =========================
+            // DATABASE ERROR
+            // =========================
         } catch (QueryException $e) {
             \Log::error('Update Usulan - DB Error', [
                 'id' => $id,
@@ -529,18 +530,18 @@ public function showByHash(string $hash)
                 'message' => 'Terjadi kesalahan pada database',
             ], 500);
 
-        // =========================
-        // HTTP / FORBIDDEN / THROTTLE
-        // =========================
+            // =========================
+            // HTTP / FORBIDDEN / THROTTLE
+            // =========================
         } catch (HttpException $e) {
             return response()->json([
                 'code' => 'http_error',
                 'message' => $e->getMessage(),
             ], $e->getStatusCode());
 
-        // =========================
-        // ERROR TAK TERDUGA
-        // =========================
+            // =========================
+            // ERROR TAK TERDUGA
+            // =========================
         } catch (\Throwable $e) {
 
             \Log::error('Update Usulan - Server Error', [
@@ -598,26 +599,22 @@ public function showByHash(string $hash)
                 'message' => 'Usulan berhasil diperbarui',
                 'data'    => $usulan->fresh(),
             ], 200);
-
         } catch (ValidationException $e) {
             return response()->json([
                 'code' => 'validation_error',
                 'message' => 'Data yang dikirim tidak valid',
                 'errors' => $e->errors(),
             ], 422);
-
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Unauthorized',
             ], 403);
-
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'code'    => 'not_found',
                 'message' => 'Usulan tidak ditemukan',
             ], 404);
-
         } catch (QueryException $e) {
             \Log::error('Update Usulan (Login) - DB Error', [
                 'id' => $id,
@@ -628,7 +625,6 @@ public function showByHash(string $hash)
                 'code'    => 'database_error',
                 'message' => 'Terjadi kesalahan pada database',
             ], 500);
-
         } catch (\Throwable $e) {
             \Log::error('Update Usulan (Login) - Server Error', [
                 'id'    => $id,
@@ -715,21 +711,18 @@ public function showByHash(string $hash)
                 'message' => 'Status usulan berhasil diperbarui & notifikasi dikirim',
                 'data'    => $usulan->fresh(),
             ], 200);
-
         } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
             DB::rollBack();
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Unauthorized',
             ], 403);
-
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             DB::rollBack();
             return response()->json([
                 'code'    => 'error',
                 'message' => 'Usulan tidak ditemukan',
             ], 404);
-
         } catch (Throwable $e) {
             DB::rollBack();
             return response()->json([
@@ -767,7 +760,6 @@ public function showByHash(string $hash)
                 'code' => 'success',
                 'message' => 'Usulan berhasil dihapus'
             ]);
-
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'code' => 'error',
@@ -867,185 +859,185 @@ public function showByHash(string $hash)
         }
     }
 
-   public function getSebaranAnggaranDisetujui(Request $request)
-{
-    /* =====================================================
+    public function getSebaranAnggaranDisetujui(Request $request)
+    {
+        /* =====================================================
      * PARAMETER
      * =====================================================*/
-    $tahun = (int) $request->input('tahun', now()->year);
-    $level = $request->input('level', 'kecamatan');
+        $tahun = (int) $request->input('tahun', now()->year);
+        $level = $request->input('level', 'kecamatan');
 
-    $filterKec  = $request->input('filter_kecamatan');
-    $filterDesa = $request->input('filter_desa');
-    $filterSub  = $request->input('filter_subjenisbantuan');
+        $filterKec  = $request->input('filter_kecamatan');
+        $filterDesa = $request->input('filter_desa');
+        $filterSub  = $request->input('filter_subjenisbantuan');
 
-    if (!in_array($level, ['kecamatan', 'desa', 'subjenisbantuan'])) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Level tidak valid'
-        ], 422);
-    }
+        if (!in_array($level, ['kecamatan', 'desa', 'subjenisbantuan'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Level tidak valid'
+            ], 422);
+        }
 
-    /* =====================================================
+        /* =====================================================
      * LEVEL KECAMATAN
      * =====================================================*/
-    if ($level === 'kecamatan') {
+        if ($level === 'kecamatan') {
 
-        // master kecamatan
-        $kecamatanRows = DB::table('kecamatan as k')
-            ->when($filterKec, fn ($q) => $q->where('k.idkecamatan', $filterKec))
-            ->select('k.idkecamatan', 'k.namakecamatan')
-            ->orderBy('k.namakecamatan')
-            ->get();
+            // master kecamatan
+            $kecamatanRows = DB::table('kecamatan as k')
+                ->when($filterKec, fn($q) => $q->where('k.idkecamatan', $filterKec))
+                ->select('k.idkecamatan', 'k.namakecamatan')
+                ->orderBy('k.namakecamatan')
+                ->get();
 
-        // desa + total
-        $desaRows = DB::table('desa as d')
-            ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
-            ->leftJoin('usulan as u', function ($join) use ($tahun, $filterSub, $filterDesa) {
-                $join->on('u.iddesa', '=', 'd.iddesa')
-                    ->where('u.status', 'disetujui')
-                    ->where('u.tahun', $tahun);
+            // desa + total
+            $desaRows = DB::table('desa as d')
+                ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
+                ->leftJoin('usulan as u', function ($join) use ($tahun, $filterSub, $filterDesa) {
+                    $join->on('u.iddesa', '=', 'd.iddesa')
+                        ->where('u.status', 'disetujui')
+                        ->where('u.tahun', $tahun);
 
-                if ($filterSub !== null) {
-                    $join->where('u.idsubjenisbantuan', $filterSub);
-                }
+                    if ($filterSub !== null) {
+                        $join->where('u.idsubjenisbantuan', $filterSub);
+                    }
 
-                if ($filterDesa !== null) {
-                    $join->where('u.iddesa', $filterDesa);
-                }
-            })
-            ->when($filterKec, fn ($q) => $q->where('k.idkecamatan', $filterKec))
-            ->select(
-                'k.idkecamatan',
-                'd.iddesa',
-                'd.namadesa',
-                'd.latitude',
-                'd.longitude',
-                DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
-            )
-            ->groupBy(
-                'k.idkecamatan',
-                'd.iddesa',
-                'd.namadesa',
-                'd.latitude',
-                'd.longitude'
-            )
-            ->orderBy('d.namadesa')
-            ->get()
-            ->groupBy('idkecamatan');
+                    if ($filterDesa !== null) {
+                        $join->where('u.iddesa', $filterDesa);
+                    }
+                })
+                ->when($filterKec, fn($q) => $q->where('k.idkecamatan', $filterKec))
+                ->select(
+                    'k.idkecamatan',
+                    'd.iddesa',
+                    'd.namadesa',
+                    'd.latitude',
+                    'd.longitude',
+                    DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
+                )
+                ->groupBy(
+                    'k.idkecamatan',
+                    'd.iddesa',
+                    'd.namadesa',
+                    'd.latitude',
+                    'd.longitude'
+                )
+                ->orderBy('d.namadesa')
+                ->get()
+                ->groupBy('idkecamatan');
 
-        $data = $kecamatanRows->map(function ($kec) use ($desaRows) {
-            $desaList = collect($desaRows->get($kec->idkecamatan, []));
-            return [
-                'idkecamatan'              => (int) $kec->idkecamatan,
-                'namakecamatan'            => $kec->namakecamatan,
-                'total_anggaran_disetujui' => (int) $desaList->sum('total_anggaran_disetujui'),
-                'desa' => $desaList->map(fn ($d) => [
+            $data = $kecamatanRows->map(function ($kec) use ($desaRows) {
+                $desaList = collect($desaRows->get($kec->idkecamatan, []));
+                return [
+                    'idkecamatan'              => (int) $kec->idkecamatan,
+                    'namakecamatan'            => $kec->namakecamatan,
+                    'total_anggaran_disetujui' => (int) $desaList->sum('total_anggaran_disetujui'),
+                    'desa' => $desaList->map(fn($d) => [
+                        'iddesa'                   => (int) $d->iddesa,
+                        'namadesa'                 => $d->namadesa,
+                        'latitude'                 => $d->latitude ? (float) $d->latitude : null,
+                        'longitude'                => $d->longitude ? (float) $d->longitude : null,
+                        'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
+                    ])->values(),
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sebaran anggaran disetujui berdasarkan kecamatan',
+                'data' => $data,
+            ]);
+        }
+
+        /* =====================================================
+     * LEVEL DESA
+     * =====================================================*/
+        if ($level === 'desa') {
+
+            $desaRows = DB::table('desa as d')
+                ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
+                ->leftJoin('usulan as u', function ($join) use ($tahun, $filterSub) {
+                    $join->on('u.iddesa', '=', 'd.iddesa')
+                        ->where('u.status', 'disetujui')
+                        ->where('u.tahun', $tahun);
+
+                    if ($filterSub !== null) {
+                        $join->where('u.idsubjenisbantuan', $filterSub);
+                    }
+                })
+                ->when($filterKec, fn($q) => $q->where('k.idkecamatan', $filterKec))
+                ->when($filterDesa, fn($q) => $q->where('d.iddesa', $filterDesa))
+                ->select(
+                    'd.iddesa',
+                    'd.namadesa',
+                    'k.idkecamatan',
+                    'k.namakecamatan',
+                    'd.latitude',
+                    'd.longitude',
+                    DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
+                )
+                ->groupBy(
+                    'd.iddesa',
+                    'd.namadesa',
+                    'k.idkecamatan',
+                    'k.namakecamatan',
+                    'd.latitude',
+                    'd.longitude'
+                )
+                ->orderBy('d.namadesa')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sebaran anggaran disetujui berdasarkan desa',
+                'data' => $desaRows->map(fn($d) => [
                     'iddesa'                   => (int) $d->iddesa,
                     'namadesa'                 => $d->namadesa,
+                    'idkecamatan'              => (int) $d->idkecamatan,
+                    'namakecamatan'            => $d->namakecamatan,
                     'latitude'                 => $d->latitude ? (float) $d->latitude : null,
                     'longitude'                => $d->longitude ? (float) $d->longitude : null,
                     'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
-                ])->values(),
-            ];
-        })->values();
+                ]),
+            ]);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Sebaran anggaran disetujui berdasarkan kecamatan',
-            'data' => $data,
-        ]);
-    }
-
-    /* =====================================================
-     * LEVEL DESA
-     * =====================================================*/
-    if ($level === 'desa') {
-
-        $desaRows = DB::table('desa as d')
-            ->join('kecamatan as k', 'k.idkecamatan', '=', 'd.idkecamatan')
-            ->leftJoin('usulan as u', function ($join) use ($tahun, $filterSub) {
-                $join->on('u.iddesa', '=', 'd.iddesa')
-                    ->where('u.status', 'disetujui')
-                    ->where('u.tahun', $tahun);
-
-                if ($filterSub !== null) {
-                    $join->where('u.idsubjenisbantuan', $filterSub);
-                }
-            })
-            ->when($filterKec, fn ($q) => $q->where('k.idkecamatan', $filterKec))
-            ->when($filterDesa, fn ($q) => $q->where('d.iddesa', $filterDesa))
-            ->select(
-                'd.iddesa',
-                'd.namadesa',
-                'k.idkecamatan',
-                'k.namakecamatan',
-                'd.latitude',
-                'd.longitude',
-                DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
-            )
-            ->groupBy(
-                'd.iddesa',
-                'd.namadesa',
-                'k.idkecamatan',
-                'k.namakecamatan',
-                'd.latitude',
-                'd.longitude'
-            )
-            ->orderBy('d.namadesa')
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Sebaran anggaran disetujui berdasarkan desa',
-            'data' => $desaRows->map(fn ($d) => [
-                'iddesa'                   => (int) $d->iddesa,
-                'namadesa'                 => $d->namadesa,
-                'idkecamatan'              => (int) $d->idkecamatan,
-                'namakecamatan'            => $d->namakecamatan,
-                'latitude'                 => $d->latitude ? (float) $d->latitude : null,
-                'longitude'                => $d->longitude ? (float) $d->longitude : null,
-                'total_anggaran_disetujui' => (int) $d->total_anggaran_disetujui,
-            ]),
-        ]);
-    }
-
-    /* =====================================================
+        /* =====================================================
      * LEVEL SUB JENIS BANTUAN
      * =====================================================*/
-    if ($level === 'subjenisbantuan') {
+        if ($level === 'subjenisbantuan') {
 
-        $subRows = DB::table('sub_jenis_bantuan as s')
-            ->leftJoin('usulan as u', function ($join) use ($tahun, $filterDesa) {
-                $join->on('u.idsubjenisbantuan', '=', 's.idsubjenisbantuan')
-                    ->where('u.status', 'disetujui')
-                    ->where('u.tahun', $tahun);
+            $subRows = DB::table('sub_jenis_bantuan as s')
+                ->leftJoin('usulan as u', function ($join) use ($tahun, $filterDesa) {
+                    $join->on('u.idsubjenisbantuan', '=', 's.idsubjenisbantuan')
+                        ->where('u.status', 'disetujui')
+                        ->where('u.tahun', $tahun);
 
-                if ($filterDesa !== null) {
-                    $join->where('u.iddesa', $filterDesa);
-                }
-            })
-            ->when($filterSub, fn ($q) => $q->where('s.idsubjenisbantuan', $filterSub))
-            ->select(
-                's.idsubjenisbantuan',
-                's.namasubjenis',
-                DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
-            )
-            ->groupBy('s.idsubjenisbantuan', 's.namasubjenis')
-            ->orderBy('s.namasubjenis')
-            ->get();
+                    if ($filterDesa !== null) {
+                        $join->where('u.iddesa', $filterDesa);
+                    }
+                })
+                ->when($filterSub, fn($q) => $q->where('s.idsubjenisbantuan', $filterSub))
+                ->select(
+                    's.idsubjenisbantuan',
+                    's.namasubjenis',
+                    DB::raw('COALESCE(SUM(u.anggaran_disetujui),0) as total_anggaran_disetujui')
+                )
+                ->groupBy('s.idsubjenisbantuan', 's.namasubjenis')
+                ->orderBy('s.namasubjenis')
+                ->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Sebaran anggaran disetujui berdasarkan sub jenis bantuan',
-            'data' => $subRows->map(fn ($s) => [
-                'idsubjenisbantuan'        => (int) $s->idsubjenisbantuan,
-                'namasubjenis'             => $s->namasubjenis,
-                'total_anggaran_disetujui' => (int) $s->total_anggaran_disetujui,
-            ]),
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Sebaran anggaran disetujui berdasarkan sub jenis bantuan',
+                'data' => $subRows->map(fn($s) => [
+                    'idsubjenisbantuan'        => (int) $s->idsubjenisbantuan,
+                    'namasubjenis'             => $s->namasubjenis,
+                    'total_anggaran_disetujui' => (int) $s->total_anggaran_disetujui,
+                ]),
+            ]);
+        }
     }
-}
 
 
 

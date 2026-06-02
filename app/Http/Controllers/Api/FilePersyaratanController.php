@@ -59,7 +59,6 @@ class FilePersyaratanController extends Controller
                 'message' => 'Data berhasil disimpan',
                 'data' => $data
             ], 201);
-
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -82,7 +81,6 @@ class FilePersyaratanController extends Controller
                 'success' => true,
                 'data' => $data
             ]);
-
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -121,7 +119,6 @@ class FilePersyaratanController extends Controller
                 'message' => 'Data berhasil diupdate',
                 'data' => $data
             ]);
-
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -144,7 +141,6 @@ class FilePersyaratanController extends Controller
                 'success' => true,
                 'message' => 'Data berhasil dihapus'
             ]);
-
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -154,48 +150,47 @@ class FilePersyaratanController extends Controller
         }
     }
 
-   public function getByOpd(Request $request)
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'id_opd' => 'required|exists:opd,kode_opd',
-            'idsubjenisbantuan' => 'required|exists:sub_jenis_bantuan,idsubjenisbantuan',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validasi gagal',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $data = FilePersyaratan::with(['opd', 'subJenisBantuan'])
-            ->where('id_opd', $request->id_opd)
-            ->where('idsubjenisbantuan', $request->idsubjenisbantuan)
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $data
-        ]);
-
-    } catch (Throwable $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal mengambil data',
-            'error' => $e->getMessage()
-        ], 500);
-    }
-}
-
- public function getByLoginOpd(Request $request)
+    public function getByOpd(Request $request)
     {
         try {
-            $user = $request->user();
+            $validator = Validator::make($request->all(), [
+                'id_opd' => 'required|exists:opd,kode_opd',
+                'idsubjenisbantuan' => 'required|exists:sub_jenis_bantuan,idsubjenisbantuan',
+            ]);
 
-            // ❌ user login tidak punya kode_opd
-            if (!$user->kode_opd) {
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $data = FilePersyaratan::with(['opd', 'subJenisBantuan'])
+                ->where('id_opd', $request->id_opd)
+                ->where('idsubjenisbantuan', $request->idsubjenisbantuan)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getByLoginOpd(Request $request)
+    {
+        try {
+            $ssoUser = $request->sso_user;
+            $kodeOpd = $ssoUser['kode_opd'] ?? null;
+
+            if (!$kodeOpd) {
                 return response()->json([
                     'success' => false,
                     'message' => 'User login tidak memiliki kode OPD'
@@ -203,9 +198,8 @@ class FilePersyaratanController extends Controller
             }
 
             $query = FilePersyaratan::with(['opd', 'subJenisBantuan'])
-                ->where('id_opd', $user->kode_opd);
+                ->where('id_opd', $kodeOpd);
 
-            // 🔍 OPTIONAL FILTER
             if ($request->filled('idsubjenisbantuan')) {
                 $query->where(
                     'idsubjenisbantuan',
@@ -219,7 +213,6 @@ class FilePersyaratanController extends Controller
                 'success' => true,
                 'data' => $data
             ]);
-
         } catch (Throwable $e) {
             return response()->json([
                 'success' => false,
@@ -228,7 +221,4 @@ class FilePersyaratanController extends Controller
             ], 500);
         }
     }
-
 }
-
-

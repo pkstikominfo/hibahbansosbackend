@@ -292,19 +292,22 @@ class OpdController extends Controller
     public function me(Request $request)
     {
         // 1. Ambil user yang sedang login
-        $user = $request->user();
+        // 1. Ambil data user dari SSO token (diinject oleh middleware CheckSSO)
+        $ssoUser = $request->sso_user;
 
-        // 2. Cek apakah user memiliki kode_opd
-        // (Bisa juga ditambahkan pengecekan role jika ingin strict: $user->peran !== 'opd')
-        if (!$user->kode_opd) {
+        // 2. Ambil kode_opd dari token SSO
+        // Sesuaikan key-nya dengan claim yang ada di token kamu
+        $kodeOpd = $ssoUser['kode_opd'] ?? null;
+
+        if (!$kodeOpd) {
             return response()->json([
                 'success' => false,
                 'message' => 'User ini tidak terhubung dengan data OPD manapun.',
             ], 404);
         }
 
-        // 3. Cari data OPD berdasarkan kode_opd milik user
-        $opd = Opd::where('kode_opd', $user->kode_opd)->first();
+        // 3. Cari data OPD berdasarkan kode_opd
+        $opd = Opd::where('kode_opd', $kodeOpd)->first();
 
         if (!$opd) {
             return response()->json([

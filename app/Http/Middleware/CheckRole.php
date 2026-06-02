@@ -8,22 +8,25 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckRole
 {
-    /**
-     * Handle an incoming request.
-     */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        $user = $request->user();
+        // Ambil data user dari token SSO (diinject oleh middleware CheckSSO)
+        $ssoUser = $request->sso_user;
 
-        if (!$user) {
+        if (!$ssoUser) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthenticated.'
             ], 401);
         }
 
-        // Check if user has any of the required roles
-        if (!in_array($user->peran, $roles)) {
+        // Ambil roles dari token Keycloak
+        $userRoles = $ssoUser['realm_access']['roles'] ?? [];
+
+        // Cek apakah user punya salah satu role yang dibutuhkan
+        $hasRole = collect($userRoles)->contains(fn($role) => in_array($role, $roles));
+
+        if (!$hasRole) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. Required role: ' . implode(', ', $roles)
