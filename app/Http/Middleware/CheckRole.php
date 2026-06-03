@@ -10,21 +10,19 @@ class CheckRole
 {
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // Ambil data user dari token SSO (diinject oleh middleware CheckSSO)
-        $ssoUser = $request->sso_user;
+        // Ambil auth_user yang sudah di-sync oleh CheckSSO
+        $authUser = $request->auth_user ?? auth()->user();
 
-        if (!$ssoUser) {
+        if (!$authUser) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthenticated.'
             ], 401);
         }
 
-        // Ambil roles dari token Keycloak
-        $userRoles = $ssoUser['realm_access']['roles'] ?? [];
-
-        // Cek apakah user punya salah satu role yang dibutuhkan
-        $hasRole = collect($userRoles)->contains(fn($role) => in_array($role, $roles));
+        // Cek apakah user punya salah satu role yang dibutuhkan berdasarkan field peran di DB lokal
+        // Field peran ini sudah di-sync dengan Keycloak roles di CheckSSO
+        $hasRole = in_array($authUser->peran, $roles);
 
         if (!$hasRole) {
             return response()->json([

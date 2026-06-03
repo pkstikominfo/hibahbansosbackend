@@ -25,6 +25,8 @@ class User extends Authenticatable
         'peran',
         'kode_opd',
         'status',
+        'sso_sub',
+        'sso_username',
     ];
 
     protected $hidden = [
@@ -99,5 +101,65 @@ class User extends Authenticatable
     public function validateCredentials($password)
     {
         return Hash::check($password, $this->password);
+    }
+
+    public function scopeSso($query)
+    {
+        return $query->whereNotNull('sso_sub');
+    }
+
+    public static function syncFromSsoToken(array $payload)
+    {
+        $sub = $payload['sub'] ?? null;
+        if (!$sub) {
+            return null;
+        }
+
+        $user = self::where('sso_sub', $sub)->first();
+
+        // Cari berdasarkan email jika belum ada sso_sub (untuk migrasi akun lama)
+        if (!$user && isset($payload['email'])) {
+            $user = self::where('email', $payload['email'])->first();
+            if ($user) {
+                $user->sso_sub = $sub;
+            }
+        }
+
+        if (!$user) {
+            $user = new self();
+            $user->sso_sub = $sub;
+            $user->status = 'active';
+            // Default kode_opd if not available, usually assigned by superadmin later if needed
+            // Or use the one from token if present
+            $user->kode_opd = $payload['kode_opd'] ?? null;
+        }
+
+        $user->sso_username = $payload['preferred_username'] ?? null;
+        $user->name = $payload['name'] ?? ($payload['preferred_username'] ?? 'User SSO');
+        $user->email = $payload['email'] ?? null;
+        
+        // Sync role
+        $roles = $payload['realm_access']['roles'] ?? [];
+        $roleMap = config('services.bds.role_map', []);
+        $defaultRole = config('services.bds.default_role', 'pengusul');
+        
+        $peran = $defaultRole;
+        foreach ($roles as $role) {
+            if (isset($roleMap[$role])) {
+                $peran = $roleMap[$role];
+                break; // Ambil role pertama yang ter-map, atau bisa disesuaikan prioritasnya
+            }
+        }
+        $user->peran = $peran;
+        
+        $user->save();
+
+        return $user;
+    }
+
+    public function hasKeycloakRole(array $ssoUser, string $role): bool
+    {
+        $roles = $ssoUser['realm_access']['roles'] ?? [];
+        return in_array($role, $roles);
     }
 }

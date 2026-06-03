@@ -26,3 +26,6 @@ postman/hibah-bansos-backend.postman_collection.json
 postman/hibah-bansos-backend.local.postman_environment.json
 postman/hibah-bansos-prod.postman_environment.json
 postman/README.md
+
+# Ignore documentation files
+/public/documentation/

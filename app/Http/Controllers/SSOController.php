@@ -16,7 +16,7 @@ class SSOController extends Controller
         ]);
 
         $params = http_build_query([
-            'client_id'     => env('BDS_CLIENT_ID'),
+            'client_id'     => config('services.bds.client_id'),
             'redirect_uri'  => $request->redirect_uri,
             'response_type' => 'code',
             'scope'         => 'openid profile email',
@@ -24,7 +24,7 @@ class SSOController extends Controller
         ]);
 
         return response()->json([
-            'url' => env('BDS_SSO_BASE') . '/auth?' . $params,
+            'url' => config('services.bds.base_url') . '/auth?' . $params,
         ]);
     }
 
@@ -36,19 +36,26 @@ class SSOController extends Controller
             'redirect_uri' => 'required|url',
         ]);
 
-        $response = Http::asForm()->post(env('BDS_SSO_BASE') . '/token', [
-            'grant_type'    => 'authorization_code',
-            'client_id'     => env('BDS_CLIENT_ID'),
-            'client_secret' => env('BDS_CLIENT_SECRET'),
-            'redirect_uri'  => $request->redirect_uri,
-            'code'          => $request->code,
-        ]);
+        try {
+            $response = Http::asForm()->post(config('services.bds.base_url') . '/token', [
+                'grant_type'    => 'authorization_code',
+                'client_id'     => config('services.bds.client_id'),
+                'client_secret' => config('services.bds.client_secret'),
+                'redirect_uri'  => $request->redirect_uri,
+                'code'          => $request->code,
+            ]);
 
-        if ($response->failed()) {
+            if ($response->failed()) {
+                return response()->json([
+                    'message' => 'Gagal menukar token dengan Keycloak',
+                    'detail'  => $response->json(),
+                ], 400);
+            }
+        } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Gagal menukar token',
-                'detail'  => $response->json(),
-            ], 400);
+                'message' => 'Gagal terhubung ke server SSO Keycloak. Pastikan URL Keycloak dapat diakses dari backend.',
+                'error'   => $e->getMessage()
+            ], 500);
         }
 
         $data = $response->json();
@@ -67,10 +74,10 @@ class SSOController extends Controller
             'refresh_token' => 'required|string',
         ]);
 
-        $response = Http::asForm()->post(env('BDS_SSO_BASE') . '/token', [
+        $response = Http::asForm()->post(config('services.bds.base_url') . '/token', [
             'grant_type'    => 'refresh_token',
-            'client_id'     => env('BDS_CLIENT_ID'),
-            'client_secret' => env('BDS_CLIENT_SECRET'),
+            'client_id'     => config('services.bds.client_id'),
+            'client_secret' => config('services.bds.client_secret'),
             'refresh_token' => $request->refresh_token,
         ]);
 
@@ -94,9 +101,9 @@ class SSOController extends Controller
             'refresh_token' => 'required|string',
         ]);
 
-        Http::asForm()->post(env('BDS_SSO_BASE') . '/logout', [
-            'client_id'     => env('BDS_CLIENT_ID'),
-            'client_secret' => env('BDS_CLIENT_SECRET'),
+        Http::asForm()->post(config('services.bds.base_url') . '/logout', [
+            'client_id'     => config('services.bds.client_id'),
+            'client_secret' => config('services.bds.client_secret'),
             'refresh_token' => $request->refresh_token,
         ]);
 
@@ -118,5 +125,42 @@ class SSOController extends Controller
         // Contoh: \DB::table('active_tokens')->where('sso_sid', $payload->sid)->delete();
 
         return response()->noContent(); // 204
+    }
+
+    // 6. Profil User (dari DB Lokal yang sudah di-sync)
+    public function me(Request $request)
+    {
+        $user = $request->auth_user ?? auth()->user();
+        if ($user) {
+            $user->load('opd'); // Load relasi OPD jika ada
+        }
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Data profil berhasil diambil',
+            'data'    => $user
+        ]);
+    }
+
+    // 7. Data UserInfo dari Keycloak
+    public function userinfo(Request $request)
+    {
+        $token = $request->bearerToken();
+        
+        $response = Http::withToken($token)->get(config('services.bds.base_url') . '/userinfo');
+        
+        if ($response->failed()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data userinfo dari Keycloak',
+                'detail'  => $response->json(),
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data userinfo berhasil diambil',
+            'data'    => $response->json()
+        ]);
     }
 }

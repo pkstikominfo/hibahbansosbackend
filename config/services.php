@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    'bds' => [
+        'client_id'     => env('BDS_CLIENT_ID'),
+        'client_secret' => env('BDS_CLIENT_SECRET'),
+        'redirect_uri'  => env('BDS_REDIRECT_URI'),
+        'base_url'      => env('BDS_SSO_BASE', 'https://gate.sidik.cloud/realms/sidik/protocol/openid-connect'),
+        'role_map'      => [
+            'superadmin' => 'admin',
+            'admin_opd'  => 'opd',
+        ],
+        'default_role'  => 'pengusul',
+    ],
+
 ];

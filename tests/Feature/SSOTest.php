@@ -40,7 +40,7 @@ class SSOTest extends TestCase
     public function test_exchange_code_success(): void
     {
         Http::fake([
-            'https://gate.sidik.cloud/*' => Http::response([
+            '*' => Http::response([
                 'access_token' => 'mock-access-token',
                 'refresh_token' => 'mock-refresh-token',
                 'expires_in' => 3600,
@@ -66,7 +66,7 @@ class SSOTest extends TestCase
     public function test_refresh_token_success(): void
     {
         Http::fake([
-            'https://gate.sidik.cloud/*' => Http::response([
+            '*' => Http::response([
                 'access_token' => 'new-mock-access-token',
                 'refresh_token' => 'new-mock-refresh-token',
                 'expires_in' => 3600,
@@ -91,7 +91,7 @@ class SSOTest extends TestCase
     public function test_logout_success(): void
     {
         Http::fake([
-            'https://gate.sidik.cloud/*' => Http::response([], 200)
+            '*' => Http::response([], 200)
         ]);
 
         $response = $this->json('POST', '/api/auth/logout', [
@@ -145,7 +145,7 @@ class SSOTest extends TestCase
 
         // Mock the JWKS certs endpoint from Keycloak
         Http::fake([
-            'https://gate.sidik.cloud/realms/sidik/protocol/openid-connect/certs' => Http::response([
+            '*' => Http::response([
                 'keys' => [
                     [
                         'kty' => 'RSA',
@@ -173,7 +173,7 @@ class SSOTest extends TestCase
 
             // 3. Request a protected endpoint using the generated JWT
             $response = $this->withHeader('Authorization', 'Bearer ' . $token)
-                ->json('GET', '/api/opd-me');
+                ->json('GET', '/api/auth/me');
 
             $this->assertNotEquals(401, $response->getStatusCode());
         } catch (\Exception $e) {

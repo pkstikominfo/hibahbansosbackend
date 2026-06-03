@@ -101,7 +101,10 @@ Route::get('file-persyaratan/{id}', [FilePersyaratanController::class, 'show']);
 // ─── Protected (SSO) ────────────────────────────────────────
 Route::middleware('sso')->group(function () {
 
-    Route::get('/opd-me', [OpdController::class, 'me']);
+    Route::prefix('auth')->group(function () {
+        Route::get('/me', [SSOController::class, 'me']);
+        Route::get('/userinfo', [SSOController::class, 'userinfo']);
+    });
 
     Route::apiResource('token', TokenController::class);
 

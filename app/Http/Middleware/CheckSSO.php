@@ -6,6 +6,8 @@ use Closure;
 use Illuminate\Http\Request;
 use Firebase\JWT\JWT;
 use Firebase\JWT\JWK;
+use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 
 class CheckSSO
 {
@@ -19,8 +21,9 @@ class CheckSSO
 
         try {
             // Cache JWKS selama 6 jam — public key Keycloak jarang berubah
-            $jwks = \Illuminate\Support\Facades\Cache::remember('bds_jwks', 60 * 60 * 6, function () {
-                $raw = file_get_contents(env('BDS_SSO_BASE') . '/certs');
+            $jwks = Cache::remember('bds_jwks', 60 * 60 * 6, function () {
+                $baseUrl = config('services.bds.base_url');
+                $raw = file_get_contents($baseUrl . '/certs');
                 if (!$raw) {
                     throw new \Exception('Gagal fetch JWKS dari Keycloak');
                 }
@@ -28,10 +31,24 @@ class CheckSSO
             });
 
             $decoded = JWT::decode($token, JWK::parseKeySet($jwks));
+            $ssoUserPayload = json_decode(json_encode($decoded), true);
 
-            $request->merge(['sso_user' => (array) $decoded]);
+            // Sync user ke DB lokal
+            $authUser = User::syncFromSsoToken($ssoUserPayload);
+            if (!$authUser) {
+                return response()->json(['message' => 'Gagal sinkronisasi data user'], 500);
+            }
+
+            $request->merge([
+                'sso_user' => $ssoUserPayload,
+                'auth_user' => $authUser
+            ]);
+
+            // Set user secara stateless agar helper auth()->user() bisa dipakai
+            auth()->setUser($authUser);
+
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Token invalid atau expired'], 401);
+            return response()->json(['message' => 'Token invalid atau expired', 'error' => $e->getMessage()], 401);
         }
 
         return $next($request);
