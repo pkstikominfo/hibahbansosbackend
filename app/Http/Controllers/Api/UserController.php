@@ -43,11 +43,11 @@ class UserController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'username' => 'required|string|max:15|unique:users,username',
-                'password' => 'required|string|min:6',
+                'password' => 'nullable|string|min:6',
                 'name' => 'required|string|max:75',
                 'email' => 'required|email|max:30|unique:users,email',
                 'nohp' => 'required|string|max:12',
-                'peran' => ['required', 'string', Rule::in(['admin', 'opd', 'pengusul'])],
+                'peran' => ['required', 'string', Rule::in(['admin', 'opd'])],
                 'kode_opd' => 'nullable|string|max:10|exists:opd,kode_opd',
                 'status' => ['sometimes', 'string', Rule::in(['active', 'inactive'])]
             ], [
@@ -63,7 +63,7 @@ class UserController extends Controller
                 'email.unique' => 'Email sudah digunakan',
                 'nohp.required' => 'Nomor HP wajib diisi',
                 'peran.required' => 'Peran wajib dipilih',
-                'peran.in' => 'Peran harus admin, opd, atau pengusul',
+                'peran.in' => 'Peran harus admin atau opd',
                 'kode_opd.exists' => 'OPD tidak valid',
                 'status.in' => 'Status harus active atau inactive'
             ]);
@@ -88,7 +88,11 @@ class UserController extends Controller
             }
 
             $data = $validator->validated();
-            $data['password'] = Hash::make($data['password']);
+            if (empty($data['password'])) {
+                $data['password'] = Hash::make(str()->random(12)); // Random password yang tidak akan dipakai
+            } else {
+                $data['password'] = Hash::make($data['password']);
+            }
 
             $user = User::create($data);
             $user->load('opd');
@@ -153,11 +157,11 @@ class UserController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'username' => 'sometimes|required|string|max:15|unique:users,username,' . $id . ',id',
-                'password' => 'sometimes|required|string|min:6',
+                'password' => 'nullable|string|min:6',
                 'name' => 'sometimes|required|string|max:75',
                 'email' => 'sometimes|required|email|max:30|unique:users,email,' . $id . ',id',
                 'nohp' => 'sometimes|required|string|max:12',
-                'peran' => ['sometimes', 'required', 'string', Rule::in(['admin', 'opd', 'pengusul'])],
+                'peran' => ['sometimes', 'required', 'string', Rule::in(['admin', 'opd'])],
                 'kode_opd' => 'nullable|string|max:10|exists:opd,kode_opd',
                 'status' => ['sometimes', 'required', 'string', Rule::in(['active', 'inactive'])]
             ], [
@@ -172,7 +176,7 @@ class UserController extends Controller
                 'email.unique' => 'Email sudah digunakan',
                 'nohp.required' => 'Nomor HP wajib diisi',
                 'peran.required' => 'Peran wajib dipilih',
-                'peran.in' => 'Peran harus admin, opd, atau pengusul',
+                'peran.in' => 'Peran harus admin atau opd',
                 'kode_opd.exists' => 'OPD tidak valid',
                 'status.in' => 'Status harus active atau inactive'
             ]);
@@ -300,10 +304,10 @@ class UserController extends Controller
     public function getByRole(string $role): JsonResponse
     {
         try {
-            if (!in_array($role, ['admin', 'opd', 'pengusul'])) {
+            if (!in_array($role, ['admin', 'opd'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Peran tidak valid. Pilih: admin, opd, atau pengusul'
+                    'message' => 'Peran tidak valid. Pilih: admin atau opd'
                 ], 422);
             }
 

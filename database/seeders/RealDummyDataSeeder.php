@@ -16,7 +16,9 @@ class RealDummyDataSeeder extends Seeder
     {
         // 1. Pembersihan Data
         Schema::disableForeignKeyConstraints();
-        DB::table('spj_persyaratan')->truncate();
+        if (Schema::hasTable('spj_persyaratan')) {
+            DB::table('spj_persyaratan')->truncate();
+        }
         DB::table('spj')->truncate();
         DB::table('usulan_persyaratan')->truncate();
         Usulan::truncate();
@@ -131,10 +133,12 @@ class RealDummyDataSeeder extends Seeder
                     'updated_at' => $now,
                 ]);
 
-                DB::table('spj_persyaratan')->insert([
-                    'idspj' => $spj->idspj,
-                    'file_persyaratan' => $buktiSpj[$key],
-                ]);
+                if (Schema::hasTable('spj_persyaratan')) {
+                    DB::table('spj_persyaratan')->insert([
+                        'idspj' => $spj->idspj,
+                        'file_persyaratan' => $buktiSpj[$key],
+                    ]);
+                }
             }
         }
 

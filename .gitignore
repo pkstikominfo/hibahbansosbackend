@@ -29,3 +29,4 @@ postman/README.md
 
 # Ignore documentation files
 /public/documentation/
+docs/sso_api_documentation.md

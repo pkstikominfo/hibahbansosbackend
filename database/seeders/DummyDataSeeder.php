@@ -15,7 +15,9 @@ class DummyDataSeeder extends Seeder
     {
         Schema::disableForeignKeyConstraints();
 
-        DB::table('spj_persyaratan')->truncate();
+        if (Schema::hasTable('spj_persyaratan')) {
+            DB::table('spj_persyaratan')->truncate();
+        }
         DB::table('spj')->truncate();
         DB::table('usulan_persyaratan')->truncate();
         Usulan::truncate(); // Bisa pakai Model::truncate() atau DB::table()->truncate()
@@ -40,7 +42,7 @@ class DummyDataSeeder extends Seeder
         $subJenisIds = [1, 2, 3, 4];
         $kategoriIds = range(1, 12);
         $desaIds = range(1, 107);
-        $pengusulIds = range(25, 31);
+        $opdUserIds = range(2, 9);
 
         // ======================================================
         // 1. SEEDER FILE PERSYARATAN (20 Data)
@@ -138,7 +140,7 @@ class DummyDataSeeder extends Seeder
                 'foto' => $dummyFile, // MENGGUNAKAN FILE ASLI
                 'realisasi' => $usulan->anggaran_disetujui ?? $usulan->anggaran_usulan,
                 'status' => $faker->randomElement(['proses', 'selesai']),
-                'created_by' => $faker->randomElement($pengusulIds),
+                'created_by' => $faker->randomElement($opdUserIds),
                 'created_at' => $faker->dateTimeBetween($usulan->created_at, 'now'),
                 'updated_at' => now(),
             ]);
@@ -150,13 +152,15 @@ class DummyDataSeeder extends Seeder
         // 5. SEEDER SPJ PERSYARATAN (20 Data)
         // ======================================================
         if (!empty($spjIds)) {
-            for ($i = 0; $i < 20; $i++) {
-                DB::table('spj_persyaratan')->insert([
-                    'idspj' => $faker->randomElement($spjIds),
-                    'file_persyaratan' => $dummyFile, // MENGGUNAKAN FILE ASLI
-                ]);
+            if (Schema::hasTable('spj_persyaratan')) {
+                for ($i = 0; $i < 20; $i++) {
+                    DB::table('spj_persyaratan')->insert([
+                        'idspj' => $faker->randomElement($spjIds),
+                        'file_persyaratan' => $dummyFile, // MENGGUNAKAN FILE ASLI
+                    ]);
+                }
+                $this->command->info('Berhasil membuat 20 SPJ Persyaratan.');
             }
-            $this->command->info('Berhasil membuat 20 SPJ Persyaratan.');
         }
     }
 }

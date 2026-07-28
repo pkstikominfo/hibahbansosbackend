@@ -36,7 +36,7 @@ class CheckSSO
             // Sync user ke DB lokal
             $authUser = User::syncFromSsoToken($ssoUserPayload);
             if (!$authUser) {
-                return response()->json(['message' => 'Gagal sinkronisasi data user'], 500);
+                return response()->json(['message' => 'Akses ditolak: Akun belum terdaftar di sistem.'], 403);
             }
 
             $request->merge([

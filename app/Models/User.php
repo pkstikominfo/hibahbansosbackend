@@ -115,42 +115,31 @@ class User extends Authenticatable
             return null;
         }
 
-        $user = self::where('sso_sub', $sub)->first();
+        // Cari berdasarkan username dari sso payload, biasanya 'preferred_username'
+        $ssoUsername = $payload['preferred_username'] ?? null;
+        
+        // Cari user lokal berdasarkan username (NIP)
+        $user = self::where('username', $ssoUsername)
+            ->orWhere('sso_sub', $sub)
+            ->first();
 
-        // Cari berdasarkan email jika belum ada sso_sub (untuk migrasi akun lama)
+        // Cari berdasarkan email jika belum ketemu (opsional untuk migrasi)
         if (!$user && isset($payload['email'])) {
             $user = self::where('email', $payload['email'])->first();
-            if ($user) {
-                $user->sso_sub = $sub;
-            }
         }
 
+        // Jika user tidak terdaftar di sistem lokal, TOLAK AKSES
         if (!$user) {
-            $user = new self();
-            $user->sso_sub = $sub;
-            $user->status = 'active';
-            // Default kode_opd if not available, usually assigned by superadmin later if needed
-            // Or use the one from token if present
-            $user->kode_opd = $payload['kode_opd'] ?? null;
+            return null; 
         }
 
-        $user->sso_username = $payload['preferred_username'] ?? null;
-        $user->name = $payload['name'] ?? ($payload['preferred_username'] ?? 'User SSO');
-        $user->email = $payload['email'] ?? null;
-        
-        // Sync role
-        $roles = $payload['realm_access']['roles'] ?? [];
-        $roleMap = config('services.bds.role_map', []);
-        $defaultRole = config('services.bds.default_role', 'pengusul');
-        
-        $peran = $defaultRole;
-        foreach ($roles as $role) {
-            if (isset($roleMap[$role])) {
-                $peran = $roleMap[$role];
-                break; // Ambil role pertama yang ter-map, atau bisa disesuaikan prioritasnya
-            }
+        // Jika terdaftar, update profilnya saja dari SSO
+        $user->sso_sub = $sub;
+        $user->sso_username = $ssoUsername;
+        $user->name = $payload['name'] ?? ($ssoUsername ?? $user->name);
+        if (isset($payload['email'])) {
+            $user->email = $payload['email'];
         }
-        $user->peran = $peran;
         
         $user->save();
 

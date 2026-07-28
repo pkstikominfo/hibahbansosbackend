@@ -21,7 +21,7 @@ return new class extends Migration
             // Kolom tambahan untuk aplikasi hibah bansos
             $table->string('username', 50)->nullable();
             $table->string('nohp', 12)->nullable();
-            $table->enum('peran', ['admin', 'opd', 'pengusul'])->default('pengusul');
+            $table->enum('peran', ['admin', 'opd']);
             $table->char('kode_opd', 10)->nullable();
             $table->enum('status', ['active', 'inactive'])->default('active');
 

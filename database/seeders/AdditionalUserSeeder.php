@@ -27,18 +27,7 @@ class AdditionalUserSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $opds = Opd::all();
-        $totalCreated = 0;
-        $allUsers = array_merge($adminUsers, $opdUsers, $pengusulUsers);
 
-        foreach ($allUsers as $userData) {
-            // Hapus pengecekan existingUser - tidak perlu setelah truncate
-            User::create(array_merge($userData, [
-                'password' => Hash::make('password123'),
-                'status' => 'active'
-            ]));
-            $totalCreated++;
-            $this->command->info("Created {$userData['peran']} user: {$userData['username']}");
-        }
 
         $adminUsers = [
             [
@@ -119,70 +108,12 @@ class AdditionalUserSeeder extends Seeder
             ]
         ];
 
-        // Data user Pengusul (7 user)
-        $pengusulUsers = [
-            [
-                'username' => 'pengusul1',
-                'name' => 'Budi Santoso',
-                'email' => 'budi.santoso@example.com',
-                'nohp' => '081234562001',
-                'peran' => 'pengusul',
-                'kode_opd' => null
-            ],
-            [
-                'username' => 'pengusul2',
-                'name' => 'Siti Rahayu',
-                'email' => 'siti.rahayu@example.com',
-                'nohp' => '081234562002',
-                'peran' => 'pengusul',
-                'kode_opd' => null
-            ],
-            [
-                'username' => 'pengusul3',
-                'name' => 'Ahmad Fauzi',
-                'email' => 'ahmad.fauzi@example.com',
-                'nohp' => '081234562003',
-                'peran' => 'pengusul',
-                'kode_opd' => null
-            ],
-            [
-                'username' => 'pengusul4',
-                'name' => 'Maya Sari',
-                'email' => 'maya.sari@example.com',
-                'nohp' => '081234562004',
-                'peran' => 'pengusul',
-                'kode_opd' => null
-            ],
-            [
-                'username' => 'pengusul5',
-                'name' => 'Rizki Pratama',
-                'email' => 'rizki.pratama@example.com',
-                'nohp' => '081234562005',
-                'peran' => 'pengusul',
-                'kode_opd' => null
-            ],
-            [
-                'username' => 'pengusul6',
-                'name' => 'Dewi Anggraini',
-                'email' => 'dewi.anggraini@example.com',
-                'nohp' => '081234562006',
-                'peran' => 'pengusul',
-                'kode_opd' => null
-            ],
-            [
-                'username' => 'pengusul7',
-                'name' => 'Joko Susilo',
-                'email' => 'joko.susilo@example.com',
-                'nohp' => '081234562007',
-                'peran' => 'pengusul',
-                'kode_opd' => null
-            ]
-        ];
+        // Data user Pengusul telah dihapus
 
         $totalCreated = 0;
 
         // Gabungkan semua user ke dalam satu array untuk looping yang lebih bersih
-        $allUsers = array_merge($adminUsers, $opdUsers, $pengusulUsers);
+        $allUsers = array_merge($adminUsers, $opdUsers);
 
         foreach ($allUsers as $userData) {
             // Cek apakah user sudah ada berdasarkan username
@@ -204,7 +135,6 @@ class AdditionalUserSeeder extends Seeder
         $this->command->info("Total new users created: {$totalCreated}");
         $this->command->info("Admin Users: " . count($adminUsers));
         $this->command->info("OPD Users: " . count($opdUsers));
-        $this->command->info("Pengusul Users: " . count($pengusulUsers));
         $this->command->info("================================================");
     }
 }
