@@ -17,29 +17,17 @@ class AdditionalUserSeeder extends Seeder
      */
     public function run(): void
     {
+        // 1. Kosongkan tabel terlebih dahulu
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-
-        // Truncate semua tabel yang berelasi (child dulu, baru parent)
         DB::table('spj')->truncate();
         // DB::table('spj_detail')->truncate(); // tambahkan jika ada
         DB::table('users')->truncate();
-
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $opds = Opd::all();
         $totalCreated = 0;
-        $allUsers = array_merge($adminUsers, $opdUsers, $pengusulUsers);
 
-        foreach ($allUsers as $userData) {
-            // Hapus pengecekan existingUser - tidak perlu setelah truncate
-            User::create(array_merge($userData, [
-                'password' => Hash::make('password123'),
-                'status' => 'active'
-            ]));
-            $totalCreated++;
-            $this->command->info("Created {$userData['peran']} user: {$userData['username']}");
-        }
-
+        // 2. Definisikan semua data array SEBELUM digabungkan
         $adminUsers = [
             [
                 'username' => 'admin_super',
@@ -50,7 +38,6 @@ class AdditionalUserSeeder extends Seeder
                 'kode_opd' => null
             ]
         ];
-
 
         $opdUsers = [
             [
@@ -179,27 +166,21 @@ class AdditionalUserSeeder extends Seeder
             ]
         ];
 
-        $totalCreated = 0;
-
-        // Gabungkan semua user ke dalam satu array untuk looping yang lebih bersih
+        // 3. Gabungkan setelah datanya ada
         $allUsers = array_merge($adminUsers, $opdUsers, $pengusulUsers);
 
+        // 4. Lakukan looping (karena sudah di-truncate di awal, kita tidak perlu cek existing user lagi)
         foreach ($allUsers as $userData) {
-            // Cek apakah user sudah ada berdasarkan username
-            $existingUser = User::where('username', $userData['username'])->first();
-
-            if (!$existingUser) {
-                User::create(array_merge($userData, [
-                    'password' => Hash::make('password123'),
-                    'status' => 'active'
-                ]));
-                $totalCreated++;
-                $this->command->info("Created {$userData['peran']} user: {$userData['username']}");
-            } else {
-                $this->command->warn("User {$userData['username']} already exists, skipping...");
-            }
+            User::create(array_merge($userData, [
+                'password' => Hash::make('password123'),
+                'status' => 'active'
+            ]));
+            
+            $totalCreated++;
+            $this->command->info("Created {$userData['peran']} user: {$userData['username']}");
         }
 
+        // 5. Tampilkan rekap
         $this->command->info("======= ADDITIONAL USER SEEDER COMPLETED =======");
         $this->command->info("Total new users created: {$totalCreated}");
         $this->command->info("Admin Users: " . count($adminUsers));

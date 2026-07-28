@@ -16,7 +16,7 @@ class RealDummyDataSeeder extends Seeder
     {
         // 1. Pembersihan Data
         Schema::disableForeignKeyConstraints();
-        DB::table('spj_persyaratan')->truncate();
+        // DB::table('spj_persyaratan')->truncate(); // DIKOMENTARI: Tabel tidak ada di database
         DB::table('spj')->truncate();
         DB::table('usulan_persyaratan')->truncate();
         Usulan::truncate();
@@ -125,19 +125,20 @@ class RealDummyDataSeeder extends Seeder
                     'idusulan' => $usulan->idusulan,
                     'foto' => $fotoSpj[$key],
                     'realisasi' => $s['anggaran'],
-                    'status' => $s['spj_status'],
+                    // 'status' => $s['spj_status'],
                     'created_by' => $userId,
                     'created_at' => $now->copy()->subMonth(1),
                     'updated_at' => $now,
                 ]);
 
-                DB::table('spj_persyaratan')->insert([
-                    'idspj' => $spj->idspj,
-                    'file_persyaratan' => $buktiSpj[$key],
-                ]);
+                // DIKOMENTARI: Tabel spj_persyaratan tidak ada di database
+                // DB::table('spj_persyaratan')->insert([
+                //     'idspj' => $spj->idspj,
+                //     'file_persyaratan' => $buktiSpj[$key],
+                // ]);
             }
         }
 
-        $this->command->info('Seed Berhasil: 14 Usulan dan 10 SPJ dibuat sesuai format JSON.');
+        $this->command->info('Seed Berhasil: 14 Usulan dan 10 SPJ dibuat sesuai format JSON (tanpa spj_persyaratan).');
     }
 }
