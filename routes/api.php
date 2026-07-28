@@ -27,6 +27,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/refresh', [SSOController::class, 'refreshToken']);
     Route::post('/logout', [SSOController::class, 'logout']);
     Route::post('/backchannel-logout', [SSOController::class, 'backchannelLogout']);
+    // Tambahkan ini jika belum ada (sesuaikan dengan controller auth lokalmu)
+    Route::middleware('auth:api')->get('/me', [AuthController::class, 'me']);
 });
 
 // ─── Public ─────────────────────────────────────────────────
